@@ -1,0 +1,40 @@
+[project]
+name = "automedia"
+version = "0.1.0"
+description = "自媒体全自动运营流水线 - 一人公司多账号矩阵全链路自动化"
+requires-python = ">=3.10"
+# 版本均经 2026-07 联网核实为最新稳定版
+dependencies = [
+    "fastapi==0.138.1",          # DEV-PLAN 指定,确认最新
+    "uvicorn[standard]",
+    "sqlalchemy==2.0.51",        # 用 2.0.x,2.1 还在 beta
+    # 任务队列:Dramatiq(原生支持 Windows,RQ 依赖 fork 在 Windows 跑不了,见 DEV-PLAN-CHANGELOG 修订 3)
+    "dramatiq[redis]==2.2.0",    # 含 Redis broker
+    "redis>=4.0,<6.0",           # Dramatiq 兼容范围
+    "pydantic-settings==2.14.2", # 含安全补丁,配置加载
+    "openai",                    # DeepSeek + 智谱 GLM 均走 OpenAI 兼容格式
+    "aiosqlite>=0.22.1",
+    "httpx[socks]>=0.28.1",
+    # Phase 2: 登录态加密(Fernet 对称加密)
+    "cryptography>=44.0",
+    # Phase 2: 浏览器自动化抓 cookie / 发布 / 评论
+    "playwright>=1.61",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",                     # FastAPI 测试客户端
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"

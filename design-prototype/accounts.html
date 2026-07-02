@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>账号管理 · 自媒体运营流水线</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">AutoMedia<span class="dot">.</span></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="location.href='index.html'">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        仪表盘
+      </div>
+      <div class="nav-item" onclick="location.href='pipeline.html'">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 12h3"/></svg>
+        内容流水线
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c0-2 1.5-4 4-4"/></svg>
+        账号管理
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12c0 4-4 8-9 8-1.5 0-3-.4-4-1l-4 1 1-4c-.6-1-1-2.5-1-4 0-4 4-8 9-8s8 4 8 8z"/></svg>
+        评论中心
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg>
+        数据概览
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19 12c0 .7-.1 1.4-.2 2l2 1.5-2 3.5-2.4-1c-1 .8-2.2 1.4-3.4 1.8L13 22h-4l-.4-2.5c-1.2-.4-2.4-1-3.4-1.8l-2.4 1-2-3.5 2-1.5c-.1-.6-.2-1.3-.2-2s.1-1.4.2-2l-2-1.5 2-3.5 2.4 1c1-.8 2.2-1.4 3.4-1.8L9 2h4l.4 2.5c1.2.4 2.4 1 3.4 1.8l2.4-1 2 3.5-2 1.5c.1.6.2 1.3.2 2z"/></svg>
+        日志与设置
+      </div>
+    </nav>
+    <div class="sidebar-footer">v1.0 · 本地运行</div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+
+    <!-- 顶部 -->
+    <div class="topbar">
+      <div class="topbar-title">账号管理 <span class="text-tertiary text-sm" style="font-weight:400">(8 / 10)</span></div>
+      <div class="topbar-actions">
+        <select class="form-select" style="width:auto;padding:var(--space-sm) var(--space-md)">
+          <option>全部平台</option>
+          <option>小红书</option>
+          <option>抖音</option>
+          <option>快手</option>
+          <option>视频号</option>
+        </select>
+        <button class="btn btn-primary" onclick="openDrawer()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          添加账号
+        </button>
+      </div>
+    </div>
+
+    <!-- 账号表格 -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>账号</th>
+            <th>平台</th>
+            <th>主题</th>
+            <th>登录态</th>
+            <th>状态</th>
+            <th>最后活动</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">科</div>科技前沿观察</div></td>
+            <td><span class="platform-icon xhs">红</span> 小红书</td>
+            <td>AI / 科技</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-info">运行中</span></td>
+            <td class="text-tertiary text-sm">12:42</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">数</div>数据说职场</div></td>
+            <td><span class="platform-icon dy">抖</span> 抖音</td>
+            <td>职场 / 数据</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-success">已发布</span></td>
+            <td class="text-tertiary text-sm">12:30</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">职</div>职场进阶课</div></td>
+            <td><span class="platform-icon ks">快</span> 快手</td>
+            <td>职场 / 成长</td>
+            <td><span class="badge badge-danger">失效</span></td>
+            <td><span class="badge badge-danger">失败</span></td>
+            <td class="text-tertiary text-sm">11:18</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-secondary btn-sm">重新登录</button>
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">阅</div>阅读笔记分享</div></td>
+            <td><span class="platform-icon xhs">红</span> 小红书</td>
+            <td>阅读 / 学习</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-info">运行中</span></td>
+            <td class="text-tertiary text-sm">12:40</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">商</div>商业观察室</div></td>
+            <td><span class="platform-icon wx">视</span> 视频号</td>
+            <td>商业 / 财经</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-warning">待手动发</span></td>
+            <td class="text-tertiary text-sm">12:35</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">科</div>科技前沿观察</div></td>
+            <td><span class="platform-icon dy">抖</span> 抖音</td>
+            <td>AI / 科技</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-success">已发布</span></td>
+            <td class="text-tertiary text-sm">11:50</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">职</div>职场进阶课</div></td>
+            <td><span class="platform-icon ks">快</span> 快手</td>
+            <td>职场 / 成长</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-neutral">待执行</span></td>
+            <td class="text-tertiary text-sm">—</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><div class="cell-name"><div class="avatar">阅</div>阅读笔记分享</div></td>
+            <td><span class="platform-icon dy">抖</span> 抖音</td>
+            <td>阅读 / 学习</td>
+            <td><span class="badge badge-success">有效</span></td>
+            <td><span class="badge badge-success">已发布</span></td>
+            <td class="text-tertiary text-sm">10:20</td>
+            <td><div class="cell-actions">
+              <button class="btn btn-ghost btn-sm">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal()">删除</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-sm text-tertiary" style="margin-top:var(--space-lg)">
+      共 8 个账号 · 矩阵上限 10 · 删除账号将清除其所有内容、评论、任务记录
+    </div>
+
+  </main>
+</div>
+
+<!-- 抽屉:添加/编辑账号 -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-title">添加账号</div>
+
+  <div class="form-group">
+    <label class="form-label">平台</label>
+    <select class="form-select">
+      <option>小红书</option>
+      <option>抖音</option>
+      <option>快手</option>
+      <option>视频号(半自动)</option>
+    </select>
+    <div class="form-helper">视频号为半自动模式,AI 备好内容后需手动发布</div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">账号昵称</label>
+    <input class="form-input" placeholder="如:科技前沿观察">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">主题 / 领域</label>
+    <input class="form-input" placeholder="如:AI / 科技 / 编程">
+    <div class="form-helper">用于热点筛选和文案调性,多个用逗号分隔</div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">登录方式</label>
+    <div class="manual-content">
+      <div class="text-sm text-secondary">点击下方按钮打开浏览器,完成平台登录后自动获取登录态。</div>
+      <button class="btn btn-secondary" style="margin-top:var(--space-md);width:100%">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+        打开浏览器登录
+      </button>
+    </div>
+    <div class="form-helper">登录态加密存储在本地,有效约 7 天</div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">发布计划 <span class="text-tertiary text-sm">(可选)</span></label>
+    <div class="row">
+      <input class="form-input" type="number" value="3" min="1" max="10" style="width:80px">
+      <span class="text-secondary text-sm">条/天</span>
+    </div>
+  </div>
+
+  <div class="row" style="gap:var(--space-sm);margin-top:var(--space-xl)">
+    <button class="btn btn-primary" style="flex:1" onclick="closeDrawer();showToast('账号已添加,登录态有效')">保存账号</button>
+    <button class="btn btn-secondary" onclick="closeDrawer()">取消</button>
+  </div>
+</aside>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">删除账号</div>
+    <div class="modal-body">
+      确认删除 <strong style="color:var(--color-text)">职场进阶课 · 快手</strong>?<br><br>
+      该账号的<strong>所有内容、评论、任务记录</strong>将一并清除,且无法恢复。<br><br>
+      <span class="text-sm text-tertiary">注意:平台侧的登录态需你自行到快手 App 退出,本工具无法主动登出。</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" onclick="closeModal();showToast('账号已删除','danger')">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+function openDrawer() {
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('show');
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+function openModal() {
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+function showToast(msg, danger) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (danger ? ' danger' : '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+</script>
+</body>
+</html>

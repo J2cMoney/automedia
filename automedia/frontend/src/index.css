@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* ============================================================
+   AutoMedia 深色主题 token - 对照 design-prototype/styles.css
+   (UI 视觉单一真相源,Design-Brief §5 视觉系统的落地)
+   Tailwind v4: @theme 里定义的 token 自动生成工具类
+   ============================================================ */
+
+@theme {
+  /* ---------- 5.1 色彩(对应 styles.css :root) ---------- */
+  /* 背景层 */
+  --color-bg: #0a0a0a;            /* 页面背景,近黑非纯黑 */
+  --color-surface: #141414;       /* 卡片/面板,略亮于背景 */
+  --color-surface-hover: #1a1a1a; /* 卡片悬停 */
+  --color-border: #262626;        /* 分割线/边框,低对比 */
+  --color-border-bright: #333333; /* 聚焦/高亮边框 */
+
+  /* 文本 */
+  --color-text: #ededed;          /* 主文本 */
+  --color-text-secondary: #a1a1aa;/* 次级文本/标签 */
+  --color-text-tertiary: #71717a; /* 三级,时间戳/辅助 */
+
+  /* 强调色(蓝紫,Vercel 调) */
+  --color-primary: #635bff;       /* CTA / 主操作 */
+  --color-primary-hover: #7c70ff;
+  --color-primary-faint: rgba(99, 91, 255, 0.12);
+
+  /* 四态语义色(DP-002 核心语言) */
+  --color-success: #3ecf8e;       /* 绿:成功/正常/已发 */
+  --color-warning: #f5a623;       /* 黄:警告/临期 */
+  --color-danger: #e5484d;        /* 红:失败/删除 */
+  --color-info: #4a8dff;          /* 蓝:运行中/进行中 */
+
+  /* 态色浅底(徽章/卡片背景用) */
+  --color-success-faint: rgba(62, 207, 142, 0.12);
+  --color-warning-faint: rgba(245, 166, 35, 0.12);
+  --color-danger-faint: rgba(229, 72, 77, 0.12);
+  --color-info-faint: rgba(74, 141, 255, 0.12);
+
+  /* ---------- 5.3 间距系统(紧凑 4px 步进) ---------- */
+  --spacing: 4px;  /* Tailwind v4 base spacing unit */
+
+  /* ---------- 5.4 形状与层级(克制圆角) ---------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* ---------- 5.2 字体排版 ---------- */
+  --font-sans: 'Inter', 'Noto Sans SC', '思源黑体', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* 平台品牌色(platform-icon 用) */
+  --color-platform-xhs: #ff2442;
+  --color-platform-dy: #000000;
+  --color-platform-ks: #ff5000;
+  --color-platform-wx: #07c160;
+}
+
+/* ---------- 全局基础(对照 styles.css html/body) ---------- */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  tab-size: 4;
+}
+
+/* tabular-nums 数字对齐(CMP-004 统计数字) */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* 链接 */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* 滚动条(深色主题适配) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-bright);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* reduced-motion 支持(DP-003 / a11y) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

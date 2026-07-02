@@ -1,0 +1,28 @@
+{
+  "name": "automedia-frontend",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "自媒体全自动运营流水线 - Web 面板(Phase 2 账号管理)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^8.0.0"
+  }
+}

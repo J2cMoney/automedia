@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容流水线 · 自媒体运营流水线</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">AutoMedia<span class="dot">.</span></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="location.href='index.html'">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        仪表盘
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 12h3"/></svg>
+        内容流水线
+      </div>
+      <div class="nav-item" onclick="location.href='accounts.html'">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c0-2 1.5-4 4-4"/></svg>
+        账号管理
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12c0 4-4 8-9 8-1.5 0-3-.4-4-1l-4 1 1-4c-.6-1-1-2.5-1-4 0-4 4-8 9-8s8 4 8 8z"/></svg>
+        评论中心
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg>
+        数据概览
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19 12c0 .7-.1 1.4-.2 2l2 1.5-2 3.5-2.4-1c-1 .8-2.2 1.4-3.4 1.8L13 22h-4l-.4-2.5c-1.2-.4-2.4-1-3.4-1.8l-2.4 1-2-3.5 2-1.5c-.1-.6-.2-1.3-.2-2s.1-1.4.2-2l-2-1.5 2-3.5 2.4 1c1-.8 2.2-1.4 3.4-1.8L9 2h4l.4 2.5c1.2.4 2.4 1 3.4 1.8l2.4-1 2 3.5-2 1.5c.1.6.2 1.3.2 2z"/></svg>
+        日志与设置
+      </div>
+    </nav>
+    <div class="sidebar-footer">v1.0 · 本地运行</div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+
+    <!-- 顶部 -->
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">内容流水线</div>
+        <div class="text-sm text-tertiary mt-md">科技前沿观察 · 小红书 · 来自热点「AI Agent 开发框架对比 2026」</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm">暂停链路</button>
+        <button class="btn btn-ghost btn-sm">查看选题来源</button>
+      </div>
+    </div>
+
+    <!-- 流水线状态摘要 -->
+    <div class="row between">
+      <div class="row" style="gap:var(--space-lg)">
+        <span class="badge badge-info">运行中</span>
+        <span class="text-sm text-secondary">已用时 <span class="text-mono">4m 32s</span> · 第 4/6 环节</span>
+      </div>
+    </div>
+
+    <!-- 横向流水线 -->
+    <div class="pipeline">
+
+      <div class="pipeline-node done">
+        <div class="pipeline-icon">✓</div>
+        <div class="pipeline-name">热点采集</div>
+        <div class="pipeline-status">3 条候选</div>
+        <div class="pipeline-time">0m 12s</div>
+      </div>
+
+      <div class="pipeline-arrow">→</div>
+
+      <div class="pipeline-node done">
+        <div class="pipeline-icon">✓</div>
+        <div class="pipeline-name">文案生成</div>
+        <div class="pipeline-status">已出稿</div>
+        <div class="pipeline-time">0m 45s</div>
+      </div>
+
+      <div class="pipeline-arrow">→</div>
+
+      <div class="pipeline-node done">
+        <div class="pipeline-icon">✓</div>
+        <div class="pipeline-name">视频脚本</div>
+        <div class="pipeline-status">分镜 8 个</div>
+        <div class="pipeline-time">0m 38s</div>
+      </div>
+
+      <div class="pipeline-arrow">→</div>
+
+      <div class="pipeline-node running">
+        <div class="pipeline-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation:pulse 1s linear infinite"><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+        </div>
+        <div class="pipeline-name">视频混剪</div>
+        <div class="pipeline-status">渲染中 60%</div>
+        <div class="pipeline-time">2m 10s</div>
+        <div class="progress" style="margin-top:var(--space-sm)"><div class="progress-fill" style="width:60%"></div></div>
+      </div>
+
+      <div class="pipeline-arrow">→</div>
+
+      <div class="pipeline-node pending">
+        <div class="pipeline-icon">○</div>
+        <div class="pipeline-name">分发</div>
+        <div class="pipeline-status">等待中</div>
+        <div class="pipeline-time">—</div>
+      </div>
+
+      <div class="pipeline-arrow">→</div>
+
+      <div class="pipeline-node pending">
+        <div class="pipeline-icon">○</div>
+        <div class="pipeline-name">回评</div>
+        <div class="pipeline-status">等待中</div>
+        <div class="pipeline-time">—</div>
+      </div>
+
+    </div>
+
+    <!-- 失败重试演示(另一条链路的错误态) -->
+    <div class="section-title" style="margin-top:var(--space-2xl)">
+      <span>失败环节示例 <span class="text-tertiary text-sm" style="font-weight:400">(演示错误态)</span></span>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipeline-node done">
+        <div class="pipeline-icon">✓</div>
+        <div class="pipeline-name">热点采集</div>
+        <div class="pipeline-status">完成</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-node done">
+        <div class="pipeline-icon">✓</div>
+        <div class="pipeline-name">文案生成</div>
+        <div class="pipeline-status">完成</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-node failed">
+        <div class="pipeline-icon">✕</div>
+        <div class="pipeline-name">视频混剪</div>
+        <div class="pipeline-status" style="color:var(--color-danger)">素材不足</div>
+        <div class="text-sm text-secondary" style="margin-top:var(--space-xs)">未找到 3 个 B-roll 片段</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:var(--space-sm);width:100%">重试</button>
+        <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-xs);width:100%">手动上传素材</button>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-node pending"><div class="pipeline-icon">○</div><div class="pipeline-name">分发</div><div class="pipeline-status">阻塞</div></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-node pending"><div class="pipeline-icon">○</div><div class="pipeline-name">回评</div><div class="pipeline-status">阻塞</div></div>
+    </div>
+
+    <!-- 视频号半自动卡片(POC-1 决定的核心差异化) -->
+    <div class="manual-card">
+      <div class="manual-card-head">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        视频号 · 待手动发布
+      </div>
+      <div class="text-sm text-secondary" style="margin-bottom:var(--space-md)">
+        视频号风控严格,内容已为你打包。复制以下内容到视频号助手手动发布。
+      </div>
+
+      <div class="manual-content">
+        <div class="manual-field">
+          <div class="manual-field-label">标题</div>
+          <div class="manual-field-value">2026 最值得用的 5 个 AI Agent 框架,第 3 个绝了</div>
+        </div>
+        <div class="manual-field">
+          <div class="manual-field-label">正文</div>
+          <div class="manual-field-value text-secondary">做 AI Agent 别只盯着 LangChain。这 5 个框架各有杀手锏:LangGraph 适合高可靠场景、CrewAI 多 agent 协作、AutoGen 微软出品...完整对比看视频。</div>
+        </div>
+        <div class="manual-field">
+          <div class="manual-field-label">标签</div>
+          <div class="manual-field-value mono">#AI编程 #Agent开发 #人工智能 #科技前沿</div>
+        </div>
+        <div class="manual-field">
+          <div class="manual-field-label">封面</div>
+          <div class="row" style="gap:var(--space-sm)">
+            <div style="width:80px;height:48px;background:var(--color-border-bright);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--color-text-tertiary)">封面图</div>
+            <span class="text-sm text-tertiary">已生成 · 1280×720</span>
+          </div>
+        </div>
+        <div class="manual-field">
+          <div class="manual-field-label">视频文件</div>
+          <div class="manual-field-value mono">tech-agent-2026-07-01.mp4 · 1m 48s · 38.2MB</div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:var(--space-lg);gap:var(--space-sm)">
+        <button class="btn btn-primary" onclick="showToast('已复制全部内容到剪贴板')">复制全部内容</button>
+        <button class="btn btn-secondary" onclick="window.open('https://channels.weixin.qq.com/')">打开视频号助手</button>
+        <button class="btn btn-ghost">标记为已发布</button>
+      </div>
+    </div>
+
+    <!-- 产出物 -->
+    <div class="section-title" style="margin-top:var(--space-2xl)"><span>本次产出</span></div>
+
+    <div class="account-grid">
+      <div class="manual-content">
+        <div class="manual-field-label">文案初稿</div>
+        <div class="manual-field-value text-secondary" style="margin-top:var(--space-xs)">小红书风格 · 328 字 · 含 5 个标签</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-sm)">查看全文</button>
+      </div>
+      <div class="manual-content">
+        <div class="manual-field-label">视频脚本</div>
+        <div class="manual-field-value text-secondary" style="margin-top:var(--space-xs)">8 个分镜 · 含口播文案</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-sm)">查看脚本</button>
+      </div>
+      <div class="manual-content">
+        <div class="manual-field-label">成片视频</div>
+        <div class="manual-field-value text-secondary" style="margin-top:var(--space-xs)">1m 48s · 9:16 竖屏</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-sm)">预览</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show';
+  setTimeout(() => t.className = 'toast', 3000);
+}
+</script>
+</body>
+</html>
