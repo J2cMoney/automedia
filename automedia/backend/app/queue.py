@@ -331,6 +331,118 @@ def generate_video_task(
     }
 
 
+# ---------- Phase 5:发布 + 视频号打包 + 回评 actor ----------
+
+@tracked_actor
+def publish_task(
+    task_id: int,
+    content_id: int,
+    timeout_minutes: int = 5,
+) -> Dict[str, Any]:
+    """人机协同辅助发布任务(Phase 5 v1.6 修订,Spec A-8)。
+
+    读 Content + Account -> 调 assist_publish(有头浏览器自动上传+填文案,
+    停住等用户手动点发布,抓 URL 回填) -> 写回 Content 状态。
+
+    worker 在用户机器上跑,有头 Chrome 会弹出让用户操作。
+    超时(默认 5 分钟)用户未点发布视为放弃。
+
+    Args:
+        task_id: tracked_actor 自动注入
+        content_id: 要发布的 Content
+        timeout_minutes: 等用户点发布的超时(默认 5 分钟)
+    """
+    from datetime import datetime
+
+    from app.models.account import Account
+    from app.models.content import Content, ContentStatus
+    from app.services.publish.assist import assist_publish
+
+    with SyncSessionLocal() as s:
+        content = s.get(Content, content_id)
+        if content is None:
+            raise RuntimeError(f"Content {content_id} 不存在")
+        if content.account_id is None:
+            raise RuntimeError(f"Content {content_id} 无关联账号")
+        account = s.get(Account, content.account_id)
+        if account is None:
+            raise RuntimeError(f"账号 {content.account_id} 不存在")
+        # 标记发布中
+        content.status = ContentStatus.PUBLISHING
+        s.commit()
+
+    # 执行辅助发布(有头浏览器,长任务,等用户点发布)
+    result = assist_publish(account, content, timeout_minutes=timeout_minutes)
+
+    # 写回结果
+    with SyncSessionLocal() as s:
+        content = s.get(Content, content_id)
+        if content is not None:
+            if result.success:
+                content.status = ContentStatus.PUBLISHED
+                content.platform_post_url = result.post_url
+                content.published_at = datetime.utcnow()
+                content.error_log = None
+            else:
+                # 用户超时未点发布不算生成失败,回到已审核态供下次再发
+                if "超时" in (result.error or ""):
+                    content.status = ContentStatus.APPROVED
+                else:
+                    content.status = ContentStatus.FAILED
+                content.error_log = result.error
+            s.commit()
+
+    if not result.success:
+        raise RuntimeError(f"辅助发布未完成: {result.error}")
+    return {
+        "content_id": content_id,
+        "platform": result.platform,
+        "post_url": result.post_url,
+    }
+
+
+@tracked_actor
+def reply_comments_task(
+    task_id: int,
+    content_id: int,
+    max_replies: Optional[int] = None,
+) -> Dict[str, Any]:
+    """自动回评任务(Phase 5 FLOW-5)。
+
+    读 Content + Account -> 调 process_comments(fetch 评论 -> 生成回复 -> 模拟回复)
+    -> 抓到的新评论入 comments 表,成功回复的标 REPLIED。
+
+    Args:
+        task_id: tracked_actor 自动注入
+        content_id: 要回评的 Content(已发布的)
+        max_replies: 本次最多回几条(默认 config.REPLY_MAX_PER_POLL)
+    """
+    from app.models.account import Account
+    from app.models.content import Content
+    from app.models.comment import Comment, CommentStatus
+    from app.services.comment.orchestrator import process_comments
+
+    with SyncSessionLocal() as s:
+        content = s.get(Content, content_id)
+        if content is None:
+            raise RuntimeError(f"Content {content_id} 不存在")
+        account = s.get(Account, content.account_id) if content.account_id else None
+        if account is None:
+            raise RuntimeError(f"Content {content_id} 无有效关联账号")
+
+    # 执行回评(含限速 sleep,长任务;评论记录在 process_comments 内落库 Comment 表)
+    batch = process_comments(account, content, max_replies=max_replies)
+
+    # 批次统计写 task_runs.result,详细评论记录查 /api/comments(已落库)
+    return {
+        "content_id": content_id,
+        "fetched": batch.fetched,
+        "replied": batch.replied,
+        "skipped": batch.skipped,
+        "errors": batch.errors[:5],  # 只存前 5 条错误,避免过长
+    }
+
+
 # ---------- 公开 API ----------
 
 def submit(flow_type: str, actor_name: str, *args,

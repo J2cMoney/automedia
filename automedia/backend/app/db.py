@@ -75,8 +75,8 @@ def init_db() -> None:
     SQLite 的 create_all 只建不补列,Phase 2 给 accounts 加了 auth_status 列,
     旧库需手动补。这里做轻量迁移:create_all 后检查并补缺失列。
     """
-    # 导入模型触发注册(Phase 1 accounts/task_runs + Phase 3 topics/contents)
-    from app.models import account, content, task_run, topic  # noqa: F401
+    # 导入模型触发注册(Phase 1 accounts/task_runs + Phase 3 topics/contents + Phase 5 comments)
+    from app.models import account, comment, content, task_run, topic  # noqa: F401
     from app.models.base import Base
     from sqlalchemy import inspect, text
 

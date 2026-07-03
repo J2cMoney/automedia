@@ -5,12 +5,16 @@ import {
   accountsApi,
   tasksApi,
   videosApi,
+  publishApi,
   type Topic,
   type Content,
   type Account,
+  type Platform,
   type TaskInfo,
+  type WxPackage,
 } from '@/lib/api'
 import Badge from '@/components/Badge'
+import { ManualPublishCard } from '@/components/ManualPublishCard'
 
 /**
  * 内容流水线页 - Design-Brief SCREEN-3 + pipeline.html 原型。
@@ -304,14 +308,36 @@ export default function Pipeline() {
         ? 'pending'
         : 'pending'
 
-  // 后续 Phase 5 的节点,pending 占位
+  // ---------- Phase 5:分发 / 回评节点状态 ----------
+  // 分发节点:有内容已发布=done,发布中=publishing,失败=failed,有视频可发=pending
+  const hasPublishableContent = accountContents.some(
+    (c) => c.video_path && c.status !== 'published',
+  )
+  const publishedCount = accountContents.filter((c) => c.status === 'published').length
+  const publishingCount = accountContents.filter((c) => c.status === 'publishing').length
+  const failedPublishCount = accountContents.filter(
+    (c) => c.status === 'failed' && c.video_path,
+  ).length
+  const publishNode: NodeStatus = publishingCount > 0
+    ? 'running'
+    : publishedCount > 0
+      ? 'done'
+      : failedPublishCount > 0 && !hasPublishableContent
+        ? 'failed'
+        : hasPublishableContent
+          ? 'pending'
+          : 'pending'
+
+  // 回评节点(Phase 5 评论回复):本页暂不展示评论列表,仅占位
+  const commentNode: NodeStatus = 'pending'
+
   const pipelineNodes = [
     { key: 'hotspot', name: '热点采集', status: crawlNode, detail: crawlStatusDetail() },
     { key: 'copy', name: '文案生成', status: copyNode, detail: copyStatusDetail() },
     { key: 'script', name: '视频脚本', status: scriptNode, detail: scriptStatusDetail() },
     { key: 'video', name: '视频混剪', status: videoNode, detail: videoStatusDetail() },
-    { key: 'publish', name: '分发', status: 'pending' as NodeStatus, detail: 'Phase 5' },
-    { key: 'comment', name: '回评', status: 'pending' as NodeStatus, detail: 'Phase 5' },
+    { key: 'publish', name: '分发', status: publishNode, detail: publishStatusDetail() },
+    { key: 'comment', name: '回评', status: commentNode, detail: 'Phase 5' },
   ]
 
   function crawlStatusDetail(): string {
@@ -338,6 +364,13 @@ export default function Pipeline() {
     if (videoTask?.status === 'failed') return '生成失败'
     if (hasVideoContent) return '已成片'
     if (scriptNode === 'done') return '待生成'
+    return '等待中'
+  }
+  function publishStatusDetail(): string {
+    if (publishingCount > 0) return '发布中…'
+    if (publishedCount > 0) return `已发布 ${publishedCount} 篇`
+    if (failedPublishCount > 0) return '有失败'
+    if (hasPublishableContent) return '待发布'
     return '等待中'
   }
 
@@ -594,6 +627,29 @@ export default function Pipeline() {
                     </div>
                   )}
                 </div>
+
+                {/* Phase 5:多平台分发(每条已成片的内容一行发布操作) */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-[11px] text-text-tertiary uppercase tracking-wider mb-2">
+                    Phase 5 · 多平台分发
+                  </div>
+                  <div className="space-y-2">
+                    {accountContents.filter((c) => c.video_path).length === 0 && (
+                      <div className="text-center py-6 text-text-secondary text-sm">
+                        还没有成片内容,生成视频后可在此分发
+                      </div>
+                    )}
+                    {accountContents
+                      .filter((c) => c.video_path)
+                      .map((c) => (
+                        <PublishRow
+                          key={c.id}
+                          content={c}
+                          platform={selectedAccount?.platform}
+                        />
+                      ))}
+                  </div>
+                </div>
               </>
             )}
           </Section>
@@ -770,6 +826,203 @@ function ContentCard({ content, onView }: { content: Content; onView: () => void
       >
         {failed ? '查看错误' : '查看全文 →'}
       </button>
+    </div>
+  )
+}
+
+/**
+ * 分发操作行 - Phase 5。
+ *
+ * 按关联账号的平台分流:
+ *   - wx(视频号):半自动,点"打包视频号内容"调 packageWx,拿到 WxPackage 后渲染
+ *     ManualPublishCard(一键复制 + 跳助手)。
+ *   - xhs/dy/ks:自动发布,点"发布到{平台}"调 publishApi.trigger 拿 task_id,
+ *     用 useEffect + setTimeout 轮询 tasksApi.get 跟踪状态(范式照搬 crawl/video 轮询)。
+ *   - 已 published:直接显示发布链接。
+ *
+ * 平台未知(账号被删等)时不展示发布按钮,只显示提示。
+ */
+function PublishRow({
+  content,
+  platform,
+}: {
+  content: Content
+  platform: Platform | undefined
+}) {
+  // wx 打包结果
+  const [wxPack, setWxPack] = useState<WxPackage | null>(null)
+  const [wxLoading, setWxLoading] = useState(false)
+  const [wxError, setWxError] = useState<string | null>(null)
+
+  // 自动发布任务(xhs/dy/ks)
+  const [publishTaskId, setPublishTaskId] = useState<number | null>(null)
+  const [publishTask, setPublishTask] = useState<TaskInfo | null>(null)
+  const [publishError, setPublishError] = useState<string | null>(null)
+
+  const published = content.status === 'published'
+  const publishing = content.status === 'publishing' || publishTask?.status === 'running'
+
+  // 轮询自动发布任务状态(范式照搬 crawl/video 轮询)
+  useEffect(() => {
+    if (!publishTaskId) return
+    let active = true
+    const poll = async () => {
+      try {
+        const info = await tasksApi.get(publishTaskId)
+        if (!active) return
+        setPublishTask(info)
+        if (info.status === 'finished' || info.status === 'failed') {
+          // 完成后由父级 load 刷新 contents(content.status 会更新)
+          return
+        }
+      } catch {
+        /* 忽略轮询错误 */
+      }
+      setTimeout(poll, 2000)
+    }
+    poll()
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishTaskId])
+
+  // 视频号:打包手动发布内容
+  async function handlePackageWx() {
+    setWxLoading(true)
+    setWxError(null)
+    try {
+      const pack = await publishApi.packageWx(content.id)
+      setWxPack(pack)
+    } catch (e) {
+      setWxError((e as Error).message)
+    } finally {
+      setWxLoading(false)
+    }
+  }
+
+  // xhs/dy/ks:触发自动发布
+  async function handlePublish() {
+    setPublishError(null)
+    try {
+      const resp = await publishApi.trigger(content.id)
+      setPublishTaskId(resp.task_id)
+      setPublishTask(null)
+    } catch (e) {
+      setPublishError((e as Error).message)
+    }
+  }
+
+  // 平台未知的兜底
+  if (!platform) {
+    return (
+      <div className="px-3 py-2 bg-surface border border-border rounded-md text-xs text-text-tertiary">
+        #{content.id} {(content.title || '无标题').slice(0, 24)} · 关联账号已被删除,无法分发
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-3 py-2 bg-surface border border-border rounded-md">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm truncate">
+            #{content.id} {(content.title || '无标题').slice(0, 24)}
+          </span>
+          {/* 状态徽章 */}
+          {published ? (
+            <Badge variant="success">已发布</Badge>
+          ) : publishing ? (
+            <Badge variant="info" pulse>
+              发布中
+            </Badge>
+          ) : publishTask?.status === 'failed' ? (
+            <Badge variant="danger">发布失败</Badge>
+          ) : (
+            <Badge variant="neutral">待发布</Badge>
+          )}
+        </div>
+
+        {/* 操作区 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* 已发布:直接展示链接 */}
+          {published && content.platform_post_url ? (
+            <a
+              href={content.platform_post_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-bg-bright text-text border border-border-bright rounded-md text-xs hover:bg-surface-hover"
+            >
+              查看发布 →
+            </a>
+          ) : platform === 'wx' ? (
+            // 视频号:打包手动发布
+            wxPack ? null : (
+              <button
+                className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover disabled:opacity-50"
+                onClick={handlePackageWx}
+                disabled={wxLoading}
+              >
+                {wxLoading ? '打包中…' : '打包视频号内容'}
+              </button>
+            )
+          ) : (
+            // xhs/dy/ks:人机协同辅助发布(v1.6 Spec A-8)
+            <button
+              className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover disabled:opacity-50"
+              onClick={handlePublish}
+              disabled={publishing}
+            >
+              {publishing ? '发布中…' : `辅助发布到${platformLabel(platform)}`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 辅助发布任务进度(v1.6 人机协同) */}
+      {publishTask && (
+        <div
+          className={`mt-2 px-3 py-2 rounded-md text-xs ${
+            publishTask.status === 'failed'
+              ? 'bg-danger-faint text-danger border border-danger/30'
+              : publishTask.status === 'finished'
+                ? 'bg-success-faint text-success border border-success/30'
+                : 'bg-info-faint text-info border border-info/30'
+          }`}
+        >
+          {publishTask.status === 'running' &&
+            `已打开浏览器并自动填好内容,请在弹出的浏览器中确认并点「发布」按钮(5 分钟内有效)`}
+          {publishTask.status === 'finished' &&
+            `✓ 已发布到${platformLabel(platform)}`}
+          {publishTask.status === 'failed' &&
+            `✕ 发布未完成:${publishTask.error_log || '未知错误'}`}
+        </div>
+      )}
+
+      {/* 自动发布失败时给重试入口 */}
+      {publishTask?.status === 'failed' && (
+        <button
+          className="mt-1 px-2 py-1 text-xs text-primary hover:text-primary-hover"
+          onClick={handlePublish}
+        >
+          重试发布
+        </button>
+      )}
+
+      {/* 视频号打包结果:展开 ManualPublishCard */}
+      {platform === 'wx' && wxPack && <div className="mt-2"><ManualPublishCard pack={wxPack} /></div>}
+
+      {/* 错误提示 */}
+      {wxError && (
+        <div className="mt-2 px-3 py-2 rounded-md text-xs bg-danger-faint text-danger border border-danger/30">
+          打包失败:{wxError}
+        </div>
+      )}
+      {publishError && (
+        <div className="mt-2 px-3 py-2 rounded-md text-xs bg-danger-faint text-danger border border-danger/30">
+          发布失败:{publishError}
+        </div>
+      )}
     </div>
   )
 }

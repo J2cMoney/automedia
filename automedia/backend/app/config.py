@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     MAX_RENDER_CONCURRENCY: int = 2
     PUBLISH_INTERVAL_MINUTES: int = 30
 
+    # ---- Phase 5: 发布/回评风控限速 ----
+    # Spec FLOW-5:回评间隔 X 秒防风控,X 待实跑调试;默认 60 秒/条(保守留缓冲,实跑后调小)
+    REPLY_INTERVAL_SECONDS: int = 60
+    # 单次轮询最多回 N 条,防止一次刷屏触发风控
+    REPLY_MAX_PER_POLL: int = 10
+
     # ---- Phase 4: Pexels 无版权素材源(场景B 找素材)----
     # 2026-07 仍免费:200 次/小时、2 万次/月;pexels.com/api 即时申请
     PEXELS_API_KEY: str = Field(

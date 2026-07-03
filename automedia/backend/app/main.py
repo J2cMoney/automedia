@@ -19,7 +19,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.api.accounts import router as accounts_router
+from app.api.comments import router as comments_router
 from app.api.contents import router as contents_router
+from app.api.publish import router as publish_router
 from app.api.topics import router as topics_router
 from app.api.videos import router as videos_router
 from app.config import settings
@@ -55,8 +57,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AutoMedia API",
-    description="自媒体全自动运营流水线 - Phase 1-4(基础设施+账号矩阵+热点文案+视频智能剪辑)",
-    version="0.4.0",
+    description="自媒体全自动运营流水线 - Phase 1-5(基础设施+账号矩阵+热点文案+视频智能剪辑+多平台分发与回评)",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -84,6 +86,10 @@ app.include_router(contents_router)
 
 # ---------- Phase 4:视频生成路由 ----------
 app.include_router(videos_router)
+
+# ---------- Phase 5:发布 + 评论路由 ----------
+app.include_router(publish_router)
+app.include_router(comments_router)
 
 
 # ---------- 响应模型 ----------

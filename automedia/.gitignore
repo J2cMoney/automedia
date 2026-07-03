@@ -71,3 +71,4 @@ remotion_project/public/
 # ---- 日志 ----
 *.log
 logs/
+*.tsbuildinfo

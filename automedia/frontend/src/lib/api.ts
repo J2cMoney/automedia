@@ -371,3 +371,82 @@ export const videosApi = {
     return request<VideoStatus>(`/api/videos/${contentId}`)
   },
 }
+
+// ---------- Phase 5:多平台分发(对齐后端 publish.py) ----------
+
+/** 视频号手动发布打包内容(对齐后端 publish.WxPackage)。 */
+export interface WxPackage {
+  title: string
+  body: string
+  tags: string[]
+  video_path: string
+  cover_path: string | null
+  copy_text: string
+  channels_url: string
+}
+
+/** 触发自动发布后返回的异步任务标识(小红书/抖音/快手)。 */
+export interface PublishTaskResponse {
+  task_id: number
+  content_id: number
+  message: string
+}
+
+export const publishApi = {
+  /** 触发自动发布(异步任务,小红书/抖音/快手)。headless 控制是否隐藏浏览器窗口。 */
+  trigger(contentId: number, headless = true): Promise<PublishTaskResponse> {
+    return request<PublishTaskResponse>(`/api/publish/${contentId}`, {
+      method: 'POST',
+      body: JSON.stringify({ headless }),
+    })
+  },
+
+  /** 打包视频号手动发布所需的内容(标题/正文/标签/复制文案/助手链接)。 */
+  packageWx(contentId: number): Promise<WxPackage> {
+    return request<WxPackage>(`/api/publish/wx/${contentId}/package`, {
+      method: 'POST',
+    })
+  },
+}
+
+// ---------- Phase 5:评论回复(对齐后端 comments.py) ----------
+
+/** 评论处理状态(pending 待回复 / replied 已回复 / manual 转人工)。 */
+export type CommentStatus = 'pending' | 'replied' | 'manual'
+
+/** 评论记录(对齐后端 comments.Comment 响应模型)。 */
+export interface Comment {
+  id: number
+  content_id: number
+  platform_comment_id: string | null
+  author: string | null
+  text: string
+  ai_reply: string | null
+  status: CommentStatus
+  replied_at: string | null
+  error_log: string | null
+  created_at: string
+}
+
+export const commentsApi = {
+  /** 查评论列表,可按内容和状态过滤。 */
+  list(params: { contentId?: number; status?: CommentStatus } = {}): Promise<Comment[]> {
+    const qs = new URLSearchParams()
+    if (params.contentId) qs.set('content_id', String(params.contentId))
+    if (params.status) qs.set('status', params.status)
+    const q = qs.toString()
+    return request<Comment[]>(`/api/comments${q ? `?${q}` : ''}`)
+  },
+
+  /** 触发 AI 批量回复评论(异步任务)。maxReplies 可选,限制本次回复条数。 */
+  triggerReply(contentId: number, maxReplies?: number): Promise<{
+    task_id: number
+    content_id: number
+    message: string
+  }> {
+    return request(`/api/comments/${contentId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify(maxReplies != null ? { max_replies: maxReplies } : {}),
+    })
+  },
+}

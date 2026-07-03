@@ -31,15 +31,28 @@
 | 2 | ✅ 完成 | Code Review / 测试 / 编译 / 功能 | 账号矩阵 + 登录态加密 + 健康检查 + 前端骨架 |
 | 3 | ✅ 完成 | Code Review(0 HIGH) / 96 测试 / 编译 / DeepSeek 真实调用跑通 | 热点采集(Playwright 自主爬,A-2 修订) + 文案生成 + 流水线页 |
 | 4 | ✅ 完成 | Code Review(4 HIGH+2 MED 全修) / 217 测试 / 编译 / 场景A+B 真实跑通 | 视频智能剪辑(GLM 分批决策+Remotion 渲染+Edge-TTS+faster-whisper) |
-| 5 | ⬜ 待开始 | — | 多平台分发 + 自动回评 |
+| 5 | ✅ 代码完成 | Code Review(1 HIGH 回评落库断链 已修) / 305 测试 / 编译 / 真号干跑验证(发布闭环跑通) | v1.6 修订:三平台人机协同(Spec A-8)+ 自动回评(限速+落库闭环) |
 | 6 | ⬜ 待开始 | — | 全链路串联 + 面板整合 |
 
-**下一步**：Phase 5 多平台分发 + 自动回评。
+**下一步**：Phase 5 真号发布闭环已验证(视频真实发出),selector 精调留日常使用自然验证。进 Phase 6。
 
 **Phase 4 端到端验收记录**(2026-07-03):
 - 场景 A 高光提取:真实风格口播视频(2分40秒)→ GLM-4v-flash 分批看帧(4批×5帧)准确识别高光段(核心方法 vs 铺垫/结尾)→ ffmpeg 重编码剪切拼接出成片 + clip_decision.json 落盘。修复:GLM 1210(高信息帧压 jpeg)、TTS 0 字幕(boundary=WordBoundary)、Remotion 绝对路径(staticFile+public 暂存)、路径穿越防护、音画同步(TTS 时长驱动 scene duration)。
 - 场景 B 从零生成:DeepSeek 出 scene plan(英文 asset_keyword)→ Pexels 兜底(key 未配走纯色背景)→ Edge-TTS 11.1s 配音(25 WordBoundary cue)→ faster-whisper 备选 → Remotion 9:16 渲染(音画同步 5+3+3=11s + 字幕叠加)→ Content 写回。
 - 已知限制:GLM 对合成色块/噪点判"无高光"(准确,符合 Spec FLOW-3 口播适用约束);真实口播画面识别良好。Remotion 个人/≤3人免费 License。
+
+**Phase 5 代码完成记录**(2026-07-03):
+- 联网确认:MediaCrawler 2026 仍是 CLI 工具(43K star,底层 Playwright,强项评论/二级评论,无官方 API server),Phase 5 评论爬取继续走自主爬(复用 crawler.py extractor 注入模式,集成成本可控)。反检测 2026 主流是 Patchright+持久 profile,本 Phase 用持久 user_data_dir + stealth JS 平衡可用性与维护成本。
+- 架构决策(用户拍板):持久 user_data_dir(每账号独立 Chrome profile,反检测最强)+ 回评限速 60s/条可配(保守留缓冲)。
+- 实现:publish/base.py(PublishContext 持久 profile+cookie+stealth、BasePublisher 模板方法、check_publish_rate_limit 30 分钟限速)+ xhs/dy/ks 三平台(selector 多备选)+ wx 半自动打包(WxPackage 对照 CMP-007)+ comment/(fetcher 自主爬评论、replier 照 copywriter 范式、commenter 模拟回复、orchestrator 编排+限速+落库)+ queue actor + API 路由 + 前端 ManualPublishCard + Pipeline 接入。
+- Code Review:1 HIGH(回评记录不入库断链 — Comment 表建了但 orchestrator 没写,导致前端评论中心永远空、人工抽检护栏失效),已修复:orchestrator 落库 REPLIED/MANUAL 两态,新增 2 个落库闭环测试。
+- 功能测试:待用户提供真号(小红书/抖音/快手选最稳)跑通自动发布一条 + 同平台抓评论自动回复至少 1 条 + 视频号打包卡片渲染 + 限速生效验证。
+
+**Phase 5 v1.6 修订 + 真号验证记录**(2026-07-03):
+- **架构变更(用户拍板)**:三平台发布从"全自动"改为"人机协同半自动"(Spec A-8)。理由:① 真号验证发现 creator 子域有独立登录态(www cookie 不通用);② 全自动需对抗平台风控军备竞赛(代理+指纹+反检测),单人运营者 ROI 划不过来。人机协同省 95% 操作时间(上传+填文案自动化,只留用户点发布 5 秒),封号风险极低。回评因风控宽松仍保持全自动。
+- **技术实现**:auth.py 登录目标指向 creator 域(抓 galaxy_creator_session_id 等创作者中心独立登录态);新增 publish/assist.py(有头浏览器自动上传+填文案+停住等用户点发布+三信号检测发布成功);辅助发布走后端线程池(不走 Dramatiq,规避 worker fork 的 Bad file descriptor);前端「辅助发布」按钮 + 进度提示。
+- **真号干跑验证(小红书)**:① creator cookie 抓取成功;② 持久 profile 启动稳定(修了 PublishContext __exit__ 的 cm 引用 bug);③ cookie 注入成功未被 401 踢;④ 视频自动上传成功;⑤ 用户手动点发布,**笔记真实发到小红书**(核心闭环跑通)。已知待优化:标题/正文自动填充 selector 需用真实 DOM(input[placeholder='填写标题会有更多赞哦'] + .tiptap.ProseMirror,已改但留日常使用自然验证)。
+- **保留代码**:XhsPublisher/DyPublisher/KsPublisher 全自动实现保留为备选(单测保护),万一环境变化可切回。
 
 ---
 

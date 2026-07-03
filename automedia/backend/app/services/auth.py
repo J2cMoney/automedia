@@ -26,20 +26,26 @@ logger = logging.getLogger(__name__)
 
 
 # 各平台登录页 + 登录态判定 cookie 名(出现任一即视为登录成功)
+# v1.6 修订:登录目标指向各平台创作者中心(发布/回评实际操作页),
+#   而非主站。原因:创作者中心是独立子站,有独立登录态,主站 cookie 不通用。
+#   Phase 5 真号验证发现 creator.xiaohongshu.com 直接 401(见 Spec A-8)。
 PLATFORM_LOGIN: Dict[Platform, Dict] = {
     Platform.XHS: {
-        "url": "https://www.xiaohongshu.com",
-        "login_cookies": ["web_session", "customer-sso-sid"],
+        # 创作者中心(发布页所在域),登录后抓这个域的 cookie
+        "url": "https://creator.xiaohongshu.com/publish/publish",
+        "login_cookies": ["web_session", "customer-sso-sid", "galaxy_creator_session_id"],
         "name": "小红书",
     },
     Platform.DOUYIN: {
-        "url": "https://www.douyin.com",
-        "login_cookies": ["sessionid", "passport_csrf_token"],
+        # 抖音创作者服务中心
+        "url": "https://creator.douyin.com/creator-micro/content/upload",
+        "login_cookies": ["sessionid", "passport_csrf_token", "LOGIN_STATUS"],
         "name": "抖音",
     },
     Platform.KUAISHOU: {
-        "url": "https://www.kuaishou.com",
-        "login_cookies": ["userId", "kuaishou.server.web_st"],
+        # 快手创作者服务平台
+        "url": "https://cp.kuaishou.com/article/publish/video",
+        "login_cookies": ["userId", "kuaishou.server.web_st", "passToken"],
         "name": "快手",
     },
     Platform.WECHAT: {
