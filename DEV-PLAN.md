@@ -30,13 +30,16 @@
 | 1 | ✅ 完成 | Code Review / 95→96 测试 / 编译 / 功能 | 基础设施 + Dramatiq 队列(Windows 兼容) |
 | 2 | ✅ 完成 | Code Review / 测试 / 编译 / 功能 | 账号矩阵 + 登录态加密 + 健康检查 + 前端骨架 |
 | 3 | ✅ 完成 | Code Review(0 HIGH) / 96 测试 / 编译 / DeepSeek 真实调用跑通 | 热点采集(Playwright 自主爬,A-2 修订) + 文案生成 + 流水线页 |
-| 4 | ⬜ 待开始 | — | 视频智能剪辑(需用户准备 ≥2min 测试长视频) |
+| 4 | ✅ 完成 | Code Review(4 HIGH+2 MED 全修) / 217 测试 / 编译 / 场景A+B 真实跑通 | 视频智能剪辑(GLM 分批决策+Remotion 渲染+Edge-TTS+faster-whisper) |
 | 5 | ⬜ 待开始 | — | 多平台分发 + 自动回评 |
 | 6 | ⬜ 待开始 | — | 全链路串联 + 面板整合 |
 
-**下一步**：Phase 4 视频智能剪辑。前置：用户准备 1 段口播长视频(≥2 分钟)用于场景 A 验收。
+**下一步**：Phase 5 多平台分发 + 自动回评。
 
-**待手动验收项**（Phase 3 遗留，不阻塞 Phase 4）：真实 Playwright 热榜爬取需有效登录态账号 cookie，用户登录小红书后在流水线页点"采集热点"实测。
+**Phase 4 端到端验收记录**(2026-07-03):
+- 场景 A 高光提取:真实风格口播视频(2分40秒)→ GLM-4v-flash 分批看帧(4批×5帧)准确识别高光段(核心方法 vs 铺垫/结尾)→ ffmpeg 重编码剪切拼接出成片 + clip_decision.json 落盘。修复:GLM 1210(高信息帧压 jpeg)、TTS 0 字幕(boundary=WordBoundary)、Remotion 绝对路径(staticFile+public 暂存)、路径穿越防护、音画同步(TTS 时长驱动 scene duration)。
+- 场景 B 从零生成:DeepSeek 出 scene plan(英文 asset_keyword)→ Pexels 兜底(key 未配走纯色背景)→ Edge-TTS 11.1s 配音(25 WordBoundary cue)→ faster-whisper 备选 → Remotion 9:16 渲染(音画同步 5+3+3=11s + 字幕叠加)→ Content 写回。
+- 已知限制:GLM 对合成色块/噪点判"无高光"(准确,符合 Spec FLOW-3 口播适用约束);真实口播画面识别良好。Remotion 个人/≤3人免费 License。
 
 ---
 

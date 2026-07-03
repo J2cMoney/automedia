@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL: str = "deepseek-v4-flash"
 
     # ---- 智谱 GLM 视觉(视频剪辑大脑) ----
+    # 2026-07 实测:glm-4v-flash 稳定不限流,多图上限 5 张/请求(分批看帧);
+    #   glm-4.6v-flash 支持 300 图但高峰期持续 429 限流,不可用。
+    #   场景A 用 glm-4v-flash + agent 分批决策(每批5帧)。
     GLM_API_KEY: str = Field(..., description="智谱官方 API key,无默认值")
     GLM_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
     GLM_MODEL: str = "glm-4v-flash"
@@ -61,6 +64,21 @@ class Settings(BaseSettings):
     MAX_BROWSER_CONCURRENCY: int = 3
     MAX_RENDER_CONCURRENCY: int = 2
     PUBLISH_INTERVAL_MINUTES: int = 30
+
+    # ---- Phase 4: Pexels 无版权素材源(场景B 找素材)----
+    # 2026-07 仍免费:200 次/小时、2 万次/月;pexels.com/api 即时申请
+    PEXELS_API_KEY: str = Field(
+        default="",
+        description="Pexels API key,场景B 找素材用,空则素材环节失败(需手动上传兜底)",
+    )
+
+    # ---- Phase 4: Remotion 渲染(场景B 渲染成片)----
+    # Remotion 项目目录(npm 项目,含 package.json + src/index.tsx)
+    # 默认 automedia/remotion_project/,Python 子进程调 npx remotion render
+    REMOTION_PROJECT_DIR: str = Field(
+        default="",
+        description="Remotion 项目目录,空则用默认 automedia/remotion_project/",
+    )
 
     @property
     def redis_url(self) -> str:

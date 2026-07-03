@@ -94,3 +94,15 @@ def init_db() -> None:
                         "DEFAULT 'unknown' NOT NULL"
                     )
                 )
+
+    # Phase 4 迁移:给 contents 表补视频字段(video_path / script_scenes / clip_decision)
+    # Phase 3 建表时只建文案字段,Phase 4 增量加列(DEV-PLAN 明确的增量计划)
+    if "contents" in inspector.get_table_names():
+        content_cols = {c["name"] for c in inspector.get_columns("contents")}
+        with sync_engine.begin() as conn:
+            if "video_path" not in content_cols:
+                conn.execute(text("ALTER TABLE contents ADD COLUMN video_path VARCHAR(1000)"))
+            if "script_scenes" not in content_cols:
+                conn.execute(text("ALTER TABLE contents ADD COLUMN script_scenes TEXT"))
+            if "clip_decision" not in content_cols:
+                conn.execute(text("ALTER TABLE contents ADD COLUMN clip_decision TEXT"))

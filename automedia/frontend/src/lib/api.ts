@@ -255,8 +255,29 @@ export interface Content {
   status: ContentStatus
   platform_post_url: string | null
   error_log: string | null
+  // Phase 4 视频字段
+  video_path: string | null
+  script_scenes: { scenes: ScenePlan[] } | null
+  clip_decision: { segments: HighlightSegment[]; summary: string } | null
   created_at: string
   updated_at: string
+}
+
+/** 场景 B 渲染用分镜计划(对齐后端 agent.ScenePlan.to_dict) */
+export interface ScenePlan {
+  index: number
+  narration: string
+  visual: string
+  asset_keyword: string
+  duration: number
+  asset_path: string | null
+}
+
+/** 场景 A 剪辑决策切点(对齐后端 agent.HighlightSegment) */
+export interface HighlightSegment {
+  start: number
+  end: number
+  reason: string
 }
 
 export const contentsApi = {
@@ -278,5 +299,75 @@ export const contentsApi = {
 export const tasksApi = {
   get(id: number): Promise<TaskInfo> {
     return request<TaskInfo>(`/tasks/${id}`)
+  },
+}
+
+// ---------- Phase 4:视频生成(对齐后端 videos.py) ----------
+
+export interface VideoTaskResponse {
+  task_id: number
+  content_id: number
+  message: string
+}
+
+export interface UploadResponse {
+  path: string
+  filename: string
+  size: number
+}
+
+export interface VideoStatus {
+  content_id: number
+  video_path: string | null
+  script_scenes: { scenes: ScenePlan[] } | null
+  clip_decision: { segments: HighlightSegment[]; summary: string } | null
+  status: ContentStatus
+}
+
+export const videosApi = {
+  /** 上传源长视频(场景 A 输入),返回本地路径。 */
+  upload(file: File): Promise<UploadResponse> {
+    const form = new FormData()
+    form.append('file', file)
+    // 注意:multipart 不能预设 Content-Type,浏览器自动设 boundary
+    return fetch(`${BASE_URL}/api/videos/upload`, {
+      method: 'POST',
+      body: form,
+    }).then(async (r) => {
+      const text = await r.text()
+      const body = text ? JSON.parse(text) : null
+      if (!r.ok) {
+        throw new HttpError(r.status, body?.detail ?? `上传失败 (${r.status})`, body)
+      }
+      return body as UploadResponse
+    })
+  },
+
+  /** 提交场景 A 高光提取任务(异步)。 */
+  extract(data: {
+    content_id: number
+    source_video_path: string
+    target_duration?: number
+  }): Promise<VideoTaskResponse> {
+    return request<VideoTaskResponse>(`/api/videos/extract`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /** 提交场景 B 从零生成任务(异步)。 */
+  generate(data: {
+    content_id: number
+    whisper_fallback?: boolean
+  }): Promise<VideoTaskResponse> {
+    return request<VideoTaskResponse>(`/api/videos/generate`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /** 查视频生成状态。 */
+  status(contentId: number): Promise<VideoStatus> {
+    return request<VideoStatus>(`/api/videos/${contentId}`)
   },
 }

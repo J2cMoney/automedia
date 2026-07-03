@@ -11,7 +11,7 @@
 Phase 5 加发布相关路由(发布/重试),Phase 3 只读。
 """
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -37,6 +37,10 @@ class ContentOut(BaseModel):
     status: ContentStatus
     platform_post_url: Optional[str]
     error_log: Optional[str]
+    # Phase 4 视频字段
+    video_path: Optional[str] = None
+    script_scenes: Optional[Dict[str, Any]] = None
+    clip_decision: Optional[Dict[str, Any]] = None
     created_at: str
     updated_at: str
 
@@ -55,6 +59,9 @@ def _to_out(c: Content) -> ContentOut:
         status=c.status,
         platform_post_url=c.platform_post_url,
         error_log=c.error_log,
+        video_path=c.video_path,
+        script_scenes=c.script_scenes,
+        clip_decision=c.clip_decision,
         created_at=c.created_at.isoformat() if c.created_at else "",
         updated_at=c.updated_at.isoformat() if c.updated_at else "",
     )

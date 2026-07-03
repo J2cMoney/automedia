@@ -45,7 +45,7 @@ broker = RedisBroker(
     url=settings.redis_url,
     middleware=[
         AgeLimit(max_age=86400000),  # 消息最大存活 1 天(ms)
-        TimeLimit(time_limit=600000),  # 单任务最大 10 分钟
+        TimeLimit(time_limit=1800000),  # 单任务最大 30 分钟(Phase4 视频渲染可能较长)
         Callbacks(),
         Pipelines(),
         Retries(),           # 失败重试(Dramatiq 内置)
@@ -216,6 +216,119 @@ def crawl_hotspot_task(
 
     logger.info("热点爬取完成 account=%s 入库 %d 条", account_id, inserted)
     return {"account_id": account_id, "inserted": inserted, "platform": acc.platform.value}
+
+
+# ---------- Phase 4:视频智能剪辑 actor ----------
+
+@tracked_actor
+def extract_highlights_task(
+    task_id: int,
+    content_id: int,
+    source_video_path: str,
+    target_duration: int = 60,
+) -> Dict[str, Any]:
+    """场景 A:长视频高光提取(Phase 4 FLOW-3 场景 A)。
+
+    用户上传长视频 -> 抽帧 -> GLM 看帧找高光 -> 剪切拼接成 60s 短片。
+    成片路径写回 Content.video_path,clip_decision 写回 Content.clip_decision。
+
+    Args:
+        task_id: tracked_actor 自动注入
+        content_id: 关联的 Content(成片写回)
+        source_video_path: 源长视频本地路径(用户上传)
+        target_duration: 目标成片秒数(默认 60)
+    """
+    from app.services.video.extractor import extract_highlights, ExtractorError
+
+    try:
+        output_path, decision = extract_highlights(
+            source_video_path,
+            task_id=task_id,
+            target_duration=target_duration,
+        )
+    except ExtractorError as e:
+        raise RuntimeError(f"高光提取失败: {e}") from e
+
+    # 写回 Content 表
+    with SyncSessionLocal() as s:
+        from app.models.content import Content
+        content = s.get(Content, content_id)
+        if content is not None:
+            content.video_path = str(output_path)
+            content.clip_decision = decision.to_dict()
+            s.commit()
+
+    return {
+        "content_id": content_id,
+        "video_path": str(output_path),
+        "segments": len(decision.segments),
+        "summary": decision.summary,
+    }
+
+
+@tracked_actor
+def generate_video_task(
+    task_id: int,
+    content_id: int,
+    whisper_fallback: bool = False,
+) -> Dict[str, Any]:
+    """场景 B:从零生成视频(Phase 4 FLOW-3 场景 B)。
+
+    Flow-2 脚本 -> scene plan -> Pexels 素材 + TTS + 字幕 -> Remotion 渲染成片。
+    成片路径写回 Content.video_path,scene plan 写回 Content.script_scenes。
+
+    Args:
+        task_id: tracked_actor 自动注入
+        content_id: 关联的 Content(读取 video_script,写回 video_path)
+        whisper_fallback: TTS 无字幕时是否用 Whisper 备选
+    """
+    from sqlalchemy import select as sa_select
+
+    from app.models.account import Account
+    from app.models.content import Content
+    from app.services.video.generator import (
+        generate_from_script, get_missing_asset_scenes, GeneratorError,
+    )
+
+    with SyncSessionLocal() as s:
+        content = s.get(Content, content_id)
+        if content is None:
+            raise RuntimeError(f"Content {content_id} 不存在")
+        video_script = content.video_script or []
+        if not video_script:
+            raise RuntimeError(f"Content {content_id} 无 video_script,场景 B 需要先有 Flow-2 脚本")
+
+        # 取账号主题(辅助 LLM 理解素材方向)
+        acc = s.get(Account, content.account_id) if content.account_id else None
+        topic_theme = acc.topic_theme if acc else ""
+
+    try:
+        output_path, plans, cues = generate_from_script(
+            video_script,
+            task_id=task_id,
+            topic_theme=topic_theme,
+            whisper_fallback=whisper_fallback,
+        )
+    except GeneratorError as e:
+        raise RuntimeError(f"场景 B 生成失败: {e}") from e
+
+    missing = get_missing_asset_scenes(plans)
+
+    # 写回 Content 表
+    with SyncSessionLocal() as s:
+        content = s.get(Content, content_id)
+        if content is not None:
+            content.video_path = str(output_path)
+            content.script_scenes = {"scenes": [p.to_dict() for p in plans]}
+            s.commit()
+
+    return {
+        "content_id": content_id,
+        "video_path": str(output_path),
+        "scenes": len(plans),
+        "missing_asset_scenes": missing,  # 缺素材的镜(前端提示手动上传)
+        "cues": len(cues),
+    }
 
 
 # ---------- 公开 API ----------

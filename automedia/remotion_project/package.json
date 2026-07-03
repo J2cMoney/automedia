@@ -1,0 +1,18 @@
+{
+  "name": "automedia-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AutoMedia 场景B 视频渲染项目 - Python 子进程调 npx remotion render",
+  "scripts": {
+    "build": "remotion render src/index.ts Main out.mp4",
+    "ensure-browser": "remotion browser ensure"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.484",
+    "@remotion/cli": "4.0.484"
+  },
+  "license": "UNLICENSED",
+  "_license_note": "Remotion 自定义商业许可证:个人/≤3人营利免费,>3人商用需购 License(remotion.pro/license)"
+}

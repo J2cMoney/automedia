@@ -19,6 +19,13 @@ dependencies = [
     "cryptography>=44.0",
     # Phase 2: 浏览器自动化抓 cookie / 发布 / 评论
     "playwright>=1.61",
+    # Phase 4: 视频智能剪辑(2026-07 联网核实版本)
+    "imageio-ffmpeg>=0.5.1",   # 提供 ffmpeg 二进制,场景A 抽帧/剪切/拼接
+    "Pillow>=11.0",            # 抽帧后图片缩放(GLM 看图前压缩 base64 体积)
+    "edge-tts==7.2.8",         # TTS 配音,锁 ≥7.2.4(修了 403 握手 + NoAudio)
+    "faster-whisper==1.2.1",   # 字幕对齐,弃 openai-whisper(CTranslate2 后端,Windows 友好)
+    "requests>=2.32",          # Pexels API 调用(纯 HTTP,无官方 SDK)
+    "python-multipart>=0.0.32",
 ]
 
 [project.optional-dependencies]

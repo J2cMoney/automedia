@@ -63,6 +63,10 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 .vite/
+# TS 增量编译产物
+*.tsbuildinfo
+# Remotion 渲染临时产物
+remotion_project/public/
 
 # ---- 日志 ----
 *.log

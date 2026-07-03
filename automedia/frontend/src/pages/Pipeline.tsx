@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   topicsApi,
   contentsApi,
   accountsApi,
   tasksApi,
+  videosApi,
   type Topic,
   type Content,
   type Account,
@@ -14,13 +15,14 @@ import Badge from '@/components/Badge'
 /**
  * 内容流水线页 - Design-Brief SCREEN-3 + pipeline.html 原型。
  *
- * Phase 3 范围:热点采集 → 文案生成 → 视频脚本 三个节点。
- * (视频混剪/分发/回评是 Phase 4/5 的,这里显示为 pending 占位)
+ * Phase 3:热点采集 → 文案生成 → 视频脚本
+ * Phase 4:视频混剪(场景 A 高光提取 + 场景 B 从零生成)
+ * Phase 5:分发 / 回评(pending 占位)
  *
  * 对照 pipeline.html:
  *   - 横向流水线节点(CMP-006:图标+状态色+耗时,四态:待执行/运行中/完成/失败)
  *   - 顶部:选题来源 + 状态摘要
- *   - 底部:产出物列表(文案/脚本)
+ *   - 底部:产出物列表(文案/脚本)+ Phase 4 视频生成操作区
  *
  * 五态覆盖(Spec 6.2 SCREEN-3):
  *   - 空态:无账号 → 引导去账号管理;有账号无选题 → "开始采集热点"
@@ -79,6 +81,16 @@ export default function Pipeline() {
 
   // 生成中的 content(展示文案生成进度)
   const [generating, setGenerating] = useState(false)
+
+  // Phase 4:视频任务(场景 A 高光提取 / 场景 B 从零生成)
+  const [videoTaskId, setVideoTaskId] = useState<number | null>(null)
+  const [videoTask, setVideoTask] = useState<TaskInfo | null>(null)
+  // 场景 A:上传的源视频路径
+  const [uploadedVideoPath, setUploadedVideoPath] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  // 当前选中的 content(用于视频生成输入)
+  const [activeContentId, setActiveContentId] = useState<number | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 排除词(Spec FLOW-1 MUST,逗号分隔输入)
   const [excludeWordsInput, setExcludeWordsInput] = useState('')
@@ -176,6 +188,77 @@ export default function Pipeline() {
     }
   }
 
+  // ---------- Phase 4:视频生成 ----------
+
+  // 轮询视频任务状态
+  useEffect(() => {
+    if (!videoTaskId) return
+    let active = true
+    const poll = async () => {
+      try {
+        const info = await tasksApi.get(videoTaskId)
+        if (!active) return
+        setVideoTask(info)
+        if (info.status === 'finished' || info.status === 'failed') {
+          await load()
+          return
+        }
+      } catch {
+        /* 忽略轮询错误 */
+      }
+      setTimeout(poll, 3000) // 视频任务较长,3s 轮询
+    }
+    poll()
+    return () => {
+      active = false
+    }
+  }, [videoTaskId])
+
+  // 场景 A:上传源长视频
+  async function handleUploadVideo(file: File) {
+    setUploading(true)
+    setError(null)
+    try {
+      const resp = await videosApi.upload(file)
+      setUploadedVideoPath(resp.path)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // 场景 A:提交高光提取
+  async function startExtract(contentId: number) {
+    if (!uploadedVideoPath) {
+      setError('请先上传源长视频')
+      return
+    }
+    setError(null)
+    try {
+      const resp = await videosApi.extract({
+        content_id: contentId,
+        source_video_path: uploadedVideoPath,
+      })
+      setVideoTaskId(resp.task_id)
+      setVideoTask(null)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  // 场景 B:提交从零生成
+  async function startGenerate(contentId: number) {
+    setError(null)
+    try {
+      const resp = await videosApi.generate({ content_id: contentId })
+      setVideoTaskId(resp.task_id)
+      setVideoTask(null)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   // ---------- 计算流水线节点状态 ----------
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId)
   const candidateTopics = topics.filter((t) => t.status === 'candidate')
@@ -207,12 +290,26 @@ export default function Pipeline() {
   // 视频脚本节点(脚本随文案一起产出,有成功文案就有脚本)
   const scriptNode: NodeStatus = copyNode === 'done' ? 'done' : copyNode
 
-  // 后续 Phase 4/5 的节点,pending 占位
+  // Phase 4:视频混剪节点状态
+  const hasVideoContent = accountContents.some((c) => c.video_path)
+  const videoNode: NodeStatus = videoTask
+    ? videoTask.status === 'finished'
+      ? 'done'
+      : videoTask.status === 'failed'
+        ? 'failed'
+        : 'running'
+    : hasVideoContent
+      ? 'done'
+      : scriptNode === 'done'
+        ? 'pending'
+        : 'pending'
+
+  // 后续 Phase 5 的节点,pending 占位
   const pipelineNodes = [
     { key: 'hotspot', name: '热点采集', status: crawlNode, detail: crawlStatusDetail() },
     { key: 'copy', name: '文案生成', status: copyNode, detail: copyStatusDetail() },
     { key: 'script', name: '视频脚本', status: scriptNode, detail: scriptStatusDetail() },
-    { key: 'video', name: '视频混剪', status: 'pending' as NodeStatus, detail: 'Phase 4' },
+    { key: 'video', name: '视频混剪', status: videoNode, detail: videoStatusDetail() },
     { key: 'publish', name: '分发', status: 'pending' as NodeStatus, detail: 'Phase 5' },
     { key: 'comment', name: '回评', status: 'pending' as NodeStatus, detail: 'Phase 5' },
   ]
@@ -234,6 +331,13 @@ export default function Pipeline() {
       const scenes = successContents[0]?.video_script?.length ?? 0
       return scenes ? `分镜 ${scenes} 个` : '已生成'
     }
+    return '等待中'
+  }
+  function videoStatusDetail(): string {
+    if (videoTask?.status === 'running') return '渲染中…'
+    if (videoTask?.status === 'failed') return '生成失败'
+    if (hasVideoContent) return '已成片'
+    if (scriptNode === 'done') return '待生成'
     return '等待中'
   }
 
@@ -393,11 +497,104 @@ export default function Pipeline() {
                 还没有产出,采纳选题后会自动生成文案和脚本
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {accountContents.map((c) => (
-                  <ContentCard key={c.id} content={c} onView={() => setViewContent(c)} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {accountContents.map((c) => (
+                    <ContentCard key={c.id} content={c} onView={() => setViewContent(c)} />
+                  ))}
+                </div>
+
+                {/* Phase 4:视频生成操作区(需要先有文案产出的 Content) */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-[11px] text-text-tertiary uppercase tracking-wider mb-2">
+                    Phase 4 · 视频智能剪辑
+                  </div>
+
+                  {/* 选择要生成视频的 Content */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <label className="text-xs text-text-tertiary shrink-0">目标内容</label>
+                    <select
+                      className="flex-1 px-3 py-1.5 bg-bg border border-border rounded-md text-[13px] text-text focus:outline-none focus:border-primary"
+                      value={activeContentId ?? ''}
+                      onChange={(e) => setActiveContentId(Number(e.target.value) || null)}
+                    >
+                      <option value="">选择内容…</option>
+                      {accountContents.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          #{c.id} {(c.title || '无标题').slice(0, 20)}
+                          {c.video_path ? ' · 已有视频' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 场景 A:高光提取 */}
+                  <div className="flex items-center gap-2 mb-2 p-3 bg-bg rounded-md border border-border">
+                    <div className="flex-1">
+                      <div className="text-[13px] font-medium text-text">场景 A · 高光提取</div>
+                      <div className="text-xs text-text-tertiary mt-0.5">
+                        上传长视频 → GLM 看抽帧找高光 → 剪成 60s 短片
+                      </div>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleUploadVideo(f)
+                      }}
+                    />
+                    <button
+                      className="px-3 py-1.5 bg-bg-bright text-text border border-border-bright rounded-md text-xs hover:bg-surface disabled:opacity-50"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || !activeContentId}
+                    >
+                      {uploading ? '上传中…' : uploadedVideoPath ? '✓ 已上传' : '上传长视频'}
+                    </button>
+                    <button
+                      className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover disabled:opacity-50"
+                      onClick={() => activeContentId && startExtract(activeContentId)}
+                      disabled={!uploadedVideoPath || !activeContentId || videoTask?.status === 'running'}
+                    >
+                      提取高光
+                    </button>
+                  </div>
+
+                  {/* 场景 B:从零生成 */}
+                  <div className="flex items-center gap-2 p-3 bg-bg rounded-md border border-border">
+                    <div className="flex-1">
+                      <div className="text-[13px] font-medium text-text">场景 B · 从零生成</div>
+                      <div className="text-xs text-text-tertiary mt-0.5">
+                        文案脚本 → Pexels 素材 + TTS 配音 + 字幕 → Remotion 渲染成 9:16 成片
+                      </div>
+                    </div>
+                    <button
+                      className="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover disabled:opacity-50"
+                      onClick={() => activeContentId && startGenerate(activeContentId)}
+                      disabled={!activeContentId || videoTask?.status === 'running'}
+                    >
+                      {videoTask?.status === 'running' ? '生成中…' : '生成视频'}
+                    </button>
+                  </div>
+
+                  {/* 视频任务进度 */}
+                  {videoTask && (
+                    <div className={`mt-2 px-3 py-2 rounded-md text-xs ${
+                      videoTask.status === 'failed'
+                        ? 'bg-danger-faint text-danger border border-danger/30'
+                        : videoTask.status === 'finished'
+                          ? 'bg-success-faint text-success border border-success/30'
+                          : 'bg-info-faint text-info border border-info/30'
+                    }`}>
+                      {videoTask.status === 'running' && '视频生成中,渲染是 CPU 密集任务,预计几十秒到几分钟…'}
+                      {videoTask.status === 'finished' && `✓ 视频已生成,查看内容详情看成片路径`}
+                      {videoTask.status === 'failed' && `✕ 生成失败:${videoTask.error_log || '未知错误'}`}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </Section>
         </>

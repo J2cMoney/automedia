@@ -6,13 +6,13 @@
     status(生成中/待审/已审/发布中/已发布/失败),
     platform_post_url, created_at, published_at
 
-Phase 3 只建文案相关字段(title/body/tags/video_script);
-Phase 4 在本表加视频字段(video_path / script_scenes JSON / clip_decision JSON)。
-这是 DEV-PLAN 明确的增量计划,不要在 Phase 3 提前加视频列。
+Phase 3 建文案字段(title/body/tags/video_script);
+Phase 4 加视频字段(video_path / script_scenes JSON / clip_decision JSON)。
+DEV-PLAN 明确的增量计划:旧库用 init_db 轻量 ALTER TABLE 补列。
 """
 import enum
 import json
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -54,6 +54,31 @@ class _JsonList(TypeDecorator):
             return []
 
 
+class _JsonDict(TypeDecorator):
+    """SQLite 下用 Text 存 JSON 对象的自定义类型。
+
+    用于 Phase 4 视频字段:
+      - script_scenes:场景 B 渲染用的分镜计划(每镜含素材关键词/TTS文本/时长)
+      - clip_decision:场景 A GLM 输出的剪辑决策(切点 segments + 摘要)
+    读写自动序列化,默认 None(未生成时)。
+    """
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=False, default=str)
+
+    def process_result_value(self, value, dialect):
+        if value is None or value == "":
+            return None
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+
+
 class Content(TimestampMixin, Base):
     """一条内容:选题 + 账号 -> 文案 + 视频脚本 (+ Phase 4 视频)。
 
@@ -88,8 +113,15 @@ class Content(TimestampMixin, Base):
     # 失败原因(生成/发布失败时记)
     error_log: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # ---- Phase 4 待加列(video_path / script_scenes JSON / clip_decision JSON)----
-    # Phase 3 不提前加,Phase 4 建表后用 init_db 轻量迁移 ALTER TABLE 补。
+    # ---- Phase 4 视频字段(DEV-PLAN:Phase 3 留空,Phase 4 加列)----
+    # 成片文件路径(场景A高光成片 / 场景B渲染成片),相对 automedia/ 或绝对,本地 output/ 下
+    video_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    # 场景B 渲染用分镜计划:每镜含 index/narration/visual/asset_keyword/duration/asset_path
+    # 由 agent.plan_scenes_from_script 产出,Remotion 渲染时消费
+    script_scenes: Mapped[Optional[Dict[str, Any]]] = mapped_column(_JsonDict, nullable=True)
+    # 剪辑决策:场景A GLM 看抽帧输出的切点(segments)+ 摘要;场景B 为 None
+    # 结构 {"segments":[{"start":12.5,"end":18.0,"reason":"..."}], "summary":"..."}
+    clip_decision: Mapped[Optional[Dict[str, Any]]] = mapped_column(_JsonDict, nullable=True)
 
     def __repr__(self) -> str:
         return f"<Content {self.id} account={self.account_id} status={self.status.value}>"

@@ -19,12 +19,23 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Union
 
+import httpx
 from openai import OpenAI
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 # 注意:不记录 API key,即使开 DEBUG 也不打 client 配置
+
+
+def _make_http_client() -> httpx.Client:
+    """构造不走环境变量代理的 httpx client。
+
+    国内访问 DeepSeek(api.deepseek.com)/ 智谱(open.bigmodel.cn)官方 API 直连即可,
+    无需 SOCKS 代理。但用户机器若有 ALL_PROXY=socks5://... 环境变量,openai SDK
+    默认会继承导致 SOCKS 依赖报错。这里显式 trust_env=False 绕过。
+    """
+    return httpx.Client(trust_env=False, timeout=httpx.Timeout(120.0, connect=30.0))
 
 
 class LLMError(Exception):
@@ -39,11 +50,13 @@ class LLMClient:
         self._ds = OpenAI(
             api_key=settings.DEEPSEEK_API_KEY,
             base_url=settings.DEEPSEEK_BASE_URL,
+            http_client=_make_http_client(),
         )
         # GLM - 智谱官方,OpenAI 兼容格式(open.bigmodel.cn)
         self._glm = OpenAI(
             api_key=settings.GLM_API_KEY,
             base_url=settings.GLM_BASE_URL,
+            http_client=_make_http_client(),
         )
 
     # ---------- 文本(DeepSeek) ----------
