@@ -146,18 +146,29 @@ TopicExtractor = Callable[["object"], List[RawTopic]]
 
 
 def _extract_xhs(page) -> List[RawTopic]:
-    """小红书热榜抽取。热榜页词条容器,标题文本 + 热度。
-    页面结构以 2026-07 的 DOM 为准,结构变了改这里。
+    """小红书 explore 信息流抽取。2026-07 实测 DOM 为准。
+
+    小红书 explore 页的热榜板块 selector 已失效(class 改版),改抓信息流笔记
+    卡片标题(section a[class*=title])。信息流是登录态个性化推荐,作为热点
+    候选足够用(主题过滤会进一步筛)。
     """
     items: List[RawTopic] = []
-    # 小红书热榜:热榜词条通常在 .hot-item / .rank-item 等,标题 .title / .note-text
-    nodes = page.query_selector_all("[class*='hot'] [class*='title'], [class*='rank-item'] [class*='title']")
-    for i, node in enumerate(nodes[:50]):
+    # 信息流笔记标题:多 selector 兜底
+    nodes = page.query_selector_all(
+        "section a[class*='title'], [class*='note-item'] [class*='title'], "
+        "[class*='footer'] [class*='title']"
+    )
+    seen_titles: set = set()
+    rank = 0
+    for node in nodes[:50]:
         title = (node.inner_text() or "").strip()
         if not title or len(title) < 2:
             continue
-        # 热度尝试从同级元素取,取不到用排名反推
-        heat = float(50 - i)  # 简单按排名递减
+        if title in seen_titles:
+            continue
+        seen_titles.add(title)
+        rank += 1
+        heat = float(50 - rank)  # 按排名递减
         items.append(RawTopic(Platform.XHS, title, heat_score=heat))
     return items
 

@@ -32,9 +32,14 @@
 | 3 | ✅ 完成 | Code Review(0 HIGH) / 96 测试 / 编译 / DeepSeek 真实调用跑通 | 热点采集(Playwright 自主爬,A-2 修订) + 文案生成 + 流水线页 |
 | 4 | ✅ 完成 | Code Review(4 HIGH+2 MED 全修) / 217 测试 / 编译 / 场景A+B 真实跑通 | 视频智能剪辑(GLM 分批决策+Remotion 渲染+Edge-TTS+faster-whisper) |
 | 5 | ✅ 代码完成 | Code Review(1 HIGH 回评落库断链 已修) / 305 测试 / 编译 / 真号干跑验证(发布闭环跑通) | v1.6 修订:三平台人机协同(Spec A-8)+ 自动回评(限速+落库闭环) |
-| 6 | ⬜ 待开始 | — | 全链路串联 + 面板整合 |
+| 6 | ✅ 完成 | Code Review(Stage1 0 HIGH / Stage2 4 MED+5 LOW 全修) / 340 测试 / 编译 / **真链路端到端跑通** | 全链路编排器(进程内协调器方案 B)+ 调度器 + 4 个新页面 + 编排/统计 API + 端到端实测修复(worker fd + crawler selector) |
 
-**下一步**：Phase 5 真号发布闭环已验证(视频真实发出),selector 精调留日常使用自然验证。进 Phase 6。
+**下一步**：Phase 6 端到端真链路已验证通过(小红书号:热点真实爬取→DeepSeek文案→Remotion成片→停,产出 approved 待发布)。可发布。
+
+**Phase 6 端到端实测修复记录**(2026-07-03):
+- **Errno 9 worker fd 问题**:Dramatiq worker 子进程在 Windows 上跑 Playwright 报 `OSError: [Errno 9] Bad file descriptor`(worker fork 后 fd 表损坏,同 Phase 5 publish 的坑)。修复:编排器热点环节 `_crawl_hotspot_in_threadpool` 改走后端线程池(run_in_threadpool),不经 worker,绕开损坏 fd。对齐 Phase 5 publish 线程池范式。保留 task_run 记录(断点续跑/审计)。crawl_hotspot_task actor 保留(单测保护 + 非 Windows 可用)加 docstring 说明限制。
+- **小红书热榜爬 0 条**:crawler XHS extractor 的 selector `[class*='hot'] [class*='title']` 失效(页面改版)。实测 DOM 探测后改为 explore 信息流 selector `section a[class*='title'], [class*='note-item'] [class*='title'], [class*='footer'] [class*='title']`,去重后实测稳定抓到 20 条真实笔记标题。
+- **真链路验证**:小红书测试号(主题"科技")→ 热点真实爬取(topic"是你一眼就爱上的模卡吗?")→ DeepSeek 文案("一眼沦陷！AI生成的模卡也太绝了吧😱"+7标签)→ Remotion 成片(output/27/video.mp4)→ status=approved(待发布)。A-8 铁律实测守住(到成片即停,绝不自动发布)。批次 60 秒跑完三环节,零失败。
 
 **Phase 4 端到端验收记录**(2026-07-03):
 - 场景 A 高光提取:真实风格口播视频(2分40秒)→ GLM-4v-flash 分批看帧(4批×5帧)准确识别高光段(核心方法 vs 铺垫/结尾)→ ffmpeg 重编码剪切拼接出成片 + clip_decision.json 落盘。修复:GLM 1210(高信息帧压 jpeg)、TTS 0 字幕(boundary=WordBoundary)、Remotion 绝对路径(staticFile+public 暂存)、路径穿越防护、音画同步(TTS 时长驱动 scene duration)。
@@ -53,6 +58,16 @@
 - **技术实现**:auth.py 登录目标指向 creator 域(抓 galaxy_creator_session_id 等创作者中心独立登录态);新增 publish/assist.py(有头浏览器自动上传+填文案+停住等用户点发布+三信号检测发布成功);辅助发布走后端线程池(不走 Dramatiq,规避 worker fork 的 Bad file descriptor);前端「辅助发布」按钮 + 进度提示。
 - **真号干跑验证(小红书)**:① creator cookie 抓取成功;② 持久 profile 启动稳定(修了 PublishContext __exit__ 的 cm 引用 bug);③ cookie 注入成功未被 401 踢;④ 视频自动上传成功;⑤ 用户手动点发布,**笔记真实发到小红书**(核心闭环跑通)。已知待优化:标题/正文自动填充 selector 需用真实 DOM(input[placeholder='填写标题会有更多赞哦'] + .tiptap.ProseMirror,已改但留日常使用自然验证)。
 - **保留代码**:XhsPublisher/DyPublisher/KsPublisher 全自动实现保留为备选(单测保护),万一环境变化可切回。
+
+**Phase 6 代码完成记录**(2026-07-03):
+- **架构决策(用户拍板)**:全链路编排用方案 B「进程内协调器」。orchestrator.py 作为 FastAPI 进程内 async 协调器,逐个 submit() 子任务到 Dramatiq,async 轮询 task_runs 状态推进。到"视频成片"就停(产出 approved 态 Content),发布留给用户点按钮触发(复用 publish.py 线程池,A-8 人机协同铁律)。回评全自动,发布成功后可触发。
+- **并发模型**:asyncio + asyncio.Semaphore(MAX_BROWSER_CONCURRENCY=3) 限同时跑全链路的账号数。渲染串行由 render.py::_render_lock 保证(同时只跑 1 条)。失败隔离:每账号 _safe_run_account try/except 写回结果,不抛到 gather 外。
+- **新增 actor**:generate_copy_task(queue.py)— 把文案生成从同步 route 封装成 actor,这样编排器串链路时每个环节都有 task_run 记录,断点续跑天然支持(行为对齐 topics.py::_generate_copy_and_script)。
+- **新增 API**:POST /api/orchestrator/daily(启动全链路,前置校验账号存在+登录态有效+主题非空)、GET /api/orchestrator/batches/{id}(批次状态)、GET /api/orchestrator/pending(待发布列表)、GET /api/stats(聚合统计)、GET /api/tasks(任务日志)、GET /api/config(只读配置,不泄漏密钥)。
+- **新增前端 4 页**:Dashboard(SCREEN-1 仪表盘:摘要条+账号卡片网格+异常告警+CTA+批次轮询)、Comments(SCREEN-4 评论中心:按内容分组表格+回评触发)、DataOverview(SCREEN-5 数据概览:统计卡片+各账号明细,NON-7 边界)、Settings(SCREEN-6 日志与设置:配置展示+任务日志表)。Sidebar/App.tsx 6 项导航已存在,4 个 Placeholder 换成真实组件。五态全覆盖(空/错/加载/成功/无权限)。
+- **Code Review**:Stage 1 通过(0 HIGH,A-8 铁律完美守住、无安全问题、FLOW-7/8 核心功能齐全);Stage 2 通过,4 MED+5 LOW 全修:① Dashboard 异常告警加"查看日志"链接(FLOW-7 MUST)② 批次续跑 docstring 措辞纠正(批次进程内丢失,task_runs 是审计源)③ 补多账号失败隔离集成测试(2 个)④ 删死代码 safe_gather+tasksListApi ⑤ 版本号更新 0.6.0。
+- **测试**:340 全过(原 305 + 新增 35)。新增覆盖 generate_copy_task(3)、scheduler poll/semaphore/submit_and_poll(11)、orchestrator 全链路/失败隔离/多账号集成(11)、orchestrator+stats API(13)。
+- **功能测试**:待用户端到端验收(点"开始今日运营"跑测试小红书号)。已知限制:批次状态进程内字典重启丢失(task_runs 表保留审计),需用户重新点 CTA;test_topics_api 偶发数据污染(Phase 3 既有隔离弱点,非 Phase 6 引入,重跑通过)。
 
 ---
 

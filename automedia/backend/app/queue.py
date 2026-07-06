@@ -166,6 +166,13 @@ def crawl_hotspot_task(
     拿账号 cookie 爬其所在平台热榜,按主题过滤排序后批量写入 topics 表。
     Playwright 爬取在线程池外(Dramatiq worker 本身是同步进程)。
 
+    ⚠️ Windows 已知限制(Phase 6 端到端实测发现):
+    Dramatiq worker 子进程在 Windows 上跑 Playwright 会触发
+    OSError: [Errno 9] Bad file descriptor(worker fork 后 fd 表损坏,
+    同 Phase 5 publish 的坑)。单测用 .fn 直接调能过(主进程 fd 干净)。
+    生产全链路编排请走 orchestrator._crawl_hotspot_in_threadpool(后端线程池,
+    不经 worker),见 services/orchestrator.py。
+
     Args:
         task_id: tracked_actor 自动注入
         account_id: 账号 id(决定平台 + 主题过滤)
@@ -216,6 +223,109 @@ def crawl_hotspot_task(
 
     logger.info("热点爬取完成 account=%s 入库 %d 条", account_id, inserted)
     return {"account_id": account_id, "inserted": inserted, "platform": acc.platform.value}
+
+
+# ---------- Phase 6:文案+脚本生成 actor(编排器串链路用) ----------
+
+@tracked_actor
+def generate_copy_task(
+    task_id: int,
+    account_id: int,
+    topic_id: int,
+    scene_count: int = 6,
+) -> Dict[str, Any]:
+    """文案+视频脚本生成任务(Phase 6 编排器串链路用,Spec FLOW-2)。
+
+    编排器串联全链路时,文案生成作为独立环节走 Dramatiq,与热点/视频成片一样
+    有 task_run 记录,断点续跑天然支持。行为对齐 topics.py::_generate_copy_and_script
+    (同步 route 版本),但本 actor 自建 Content 并写库,不依赖 HTTP 上下文。
+
+    Args:
+        task_id: tracked_actor 自动注入
+        account_id: 账号 id(决定主题 + 平台调性)
+        topic_id: 选题 id(决定文案内容来源)
+        scene_count: 视频脚本分镜数(默认 6)
+    """
+    from app.models.account import Account
+    from app.models.content import Content, ContentStatus
+    from app.models.topic import Topic, TopicStatus
+    from app.services.copywriter import generate_copy, generate_script
+
+    with SyncSessionLocal() as s:
+        acc = s.get(Account, account_id)
+        if acc is None:
+            raise RuntimeError(f"账号 {account_id} 不存在")
+        if not acc.topic_theme:
+            raise RuntimeError(f"账号 {account_id} 未配置 topic_theme,无法生成文案")
+        topic = s.get(Topic, topic_id)
+        if topic is None:
+            raise RuntimeError(f"选题 {topic_id} 不存在")
+
+        # 建 Content(初始 GENERATING),失败也保留记录(Spec 5.3 兜底)
+        content = Content(
+            account_id=acc.id,
+            topic_id=topic.id,
+            status=ContentStatus.GENERATING,
+        )
+        s.add(content)
+        s.commit()
+        s.refresh(content)
+        content_id = content.id
+        topic_title = topic.title
+        topic_theme = acc.topic_theme
+        platform = acc.platform
+
+    # 生成(同步,DeepSeek 文本快,15s 内;copywriter 内部已有 3 次重试)
+    try:
+        copy = generate_copy(topic_title, topic_theme, platform)
+        script = generate_script(topic_title, topic_theme, copy.body, scene_count=scene_count)
+    except Exception as e:
+        # 标 FAILED 保留记录,不阻塞编排器其他账号
+        with SyncSessionLocal() as s:
+            c = s.get(Content, content_id)
+            if c is not None:
+                c.status = ContentStatus.FAILED
+                c.error_log = f"{type(e).__name__}: {e}"
+                s.commit()
+        raise RuntimeError(f"文案生成失败: {e}") from e
+
+    video_script = [
+        {
+            "index": sc.index,
+            "narration": sc.narration,
+            "visual": sc.visual,
+            "duration": sc.duration,
+        }
+        for sc in script.scenes
+    ]
+
+    # 写回 Content
+    with SyncSessionLocal() as s:
+        c = s.get(Content, content_id)
+        if c is not None:
+            c.title = copy.title
+            c.body = copy.body
+            c.tags = copy.tags
+            c.video_script = video_script
+            c.status = ContentStatus.PENDING_REVIEW
+            s.commit()
+        # 选题标 ADOPTED(已采纳生成)
+        t = s.get(Topic, topic_id)
+        if t is not None and t.status == TopicStatus.CANDIDATE:
+            t.status = TopicStatus.ADOPTED
+            s.commit()
+
+    logger.info(
+        "文案生成完成 content_id=%s account=%s topic=%s scenes=%d",
+        content_id, account_id, topic_id, len(video_script),
+    )
+    return {
+        "content_id": content_id,
+        "account_id": account_id,
+        "topic_id": topic_id,
+        "title": copy.title,
+        "scenes": len(video_script),
+    }
 
 
 # ---------- Phase 4:视频智能剪辑 actor ----------

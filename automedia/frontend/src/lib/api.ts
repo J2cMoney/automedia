@@ -450,3 +450,140 @@ export const commentsApi = {
     })
   },
 }
+
+// ---------- Phase 6:全链路编排(对齐后端 api/orchestrator.py) ----------
+
+/** 编排批次结果(单账号)。 */
+export interface AccountBatchResult {
+  account_id: number
+  status: 'pending_publish' | 'failed' | string
+  step: string
+  content_id: number | null
+  topic_id: number | null
+  error: string | null
+}
+
+/** 编排批次状态摘要。 */
+export interface BatchSummary {
+  total: number
+  pending_publish: number
+  failed: number
+  running: boolean
+}
+
+/** 编排批次状态(对应 GET /api/orchestrator/batches/{id})。 */
+export interface BatchStatus {
+  batch_id: string
+  status: 'running' | 'finished' | string
+  started_at: string
+  finished_at: string | null
+  account_ids: number[]
+  summary: BatchSummary
+  results: Record<string, AccountBatchResult>
+}
+
+/** 待发布内容(对应 GET /api/orchestrator/pending)。 */
+export interface PendingContent {
+  content_id: number
+  account_id: number | null
+  account_nickname: string | null
+  platform: Platform | null
+  title: string | null
+  video_path: string | null
+  has_video: boolean
+}
+
+export const orchestratorApi = {
+  /** 启动"今日运营"全链路(后台跑,立即返回 batch_id)。到视频成片即停(A-8)。 */
+  startDaily(data: {
+    account_ids: number[]
+    exclude_words?: string[]
+    max_topics?: number
+    scene_count?: number
+    video_whisper_fallback?: boolean
+  }): Promise<{ batch_id: string; account_ids: number[]; message: string }> {
+    return request('/api/orchestrator/daily', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /** 查批次状态(各账号进度 + 摘要)。 */
+  batchStatus(batchId: string): Promise<BatchStatus> {
+    return request<BatchStatus>(`/api/orchestrator/batches/${batchId}`)
+  },
+
+  /** 列所有待发布 Content(approved 态)。 */
+  pending(): Promise<PendingContent[]> {
+    return request<PendingContent[]>('/api/orchestrator/pending')
+  },
+}
+
+// ---------- Phase 6:统计 + 任务日志 + 配置(对齐后端 api/stats.py) ----------
+
+/** 数据概览聚合(对应 GET /api/stats,NON-7 边界:只回显)。 */
+export interface Stats {
+  contents_total: number
+  published: number
+  pending_publish: number
+  pending_review: number
+  failed: number
+  comments_total: number
+  replied: number
+  reply_pending: number
+  replied_rate: number
+}
+
+/** 任务记录(对应 GET /api/tasks)。 */
+export interface TaskRecord {
+  id: number
+  flow_type: string
+  status: string
+  message_id: string | null
+  retry_count: number
+  account_id: number | null
+  content_id: number | null
+  started_at: string | null
+  finished_at: string | null
+  error_log: string | null
+  result: string | null
+  created_at: string
+}
+
+/** 只读配置(对应 GET /api/config,绝不返回密钥)。 */
+export interface AppConfig {
+  deepseek_model: string
+  glm_model: string
+  glm_base_url: string
+  max_browser_concurrency: number
+  max_render_concurrency: number
+  publish_interval_minutes: number
+  reply_interval_seconds: number
+  reply_max_per_poll: number
+}
+
+export const statsApi = {
+  /** 数据概览聚合。 */
+  stats(): Promise<Stats> {
+    return request<Stats>('/api/stats')
+  },
+
+  /** 任务列表(带筛选,默认最近 50 条)。 */
+  tasks(params: {
+    limit?: number
+    status?: string
+    flow_type?: string
+  } = {}): Promise<TaskRecord[]> {
+    const qs = new URLSearchParams()
+    if (params.limit) qs.set('limit', String(params.limit))
+    if (params.status) qs.set('status', params.status)
+    if (params.flow_type) qs.set('flow_type', params.flow_type)
+    const q = qs.toString()
+    return request<TaskRecord[]>(`/api/tasks${q ? `?${q}` : ''}`)
+  },
+
+  /** 只读配置展示。 */
+  config(): Promise<AppConfig> {
+    return request<AppConfig>('/api/config')
+  },
+}

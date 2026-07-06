@@ -142,6 +142,145 @@ class TestRecoverOnStartup:
         assert status(tid)["status"] == "finished"  # 不变
 
 
+class TestGenerateCopyTask:
+    """Phase 6 generate_copy_task actor 单测。
+
+    范式:submit() 后用 .fn(task_id=...) 同步直接调底层函数(不依赖 worker),
+    做确定性测试,mock copywriter 不真调 LLM。
+    """
+
+    def test_generate_copy_success(self, clean_db, monkeypatch):
+        """生成成功:Content 建出 + 状态 pending_review + topic 标 adopted。"""
+        from app.db import SyncSessionLocal
+        from app.models import Account, Platform
+        from app.models.topic import Topic, TopicStatus
+        from app.queue import submit, status, generate_copy_task
+        from app.services import copywriter as cw
+
+        # 造账号 + 选题
+        with SyncSessionLocal() as s:
+            acc = Account(platform=Platform.XHS, nickname="测试号", topic_theme="AI 编程")
+            s.add(acc)
+            s.commit()
+            s.refresh(acc)
+            topic = Topic(
+                source_platform=Platform.XHS, title="AI 框架对比",
+                heat_score=80.0, match_score=0.9, matched_account_ids=[acc.id],
+                status=TopicStatus.CANDIDATE,
+            )
+            s.add(topic)
+            s.commit()
+            s.refresh(topic)
+            acc_id, topic_id = acc.id, topic.id
+
+        # mock copywriter(不真调 LLM)
+        monkeypatch.setattr(
+            cw, "generate_copy",
+            lambda title, theme, platform, **kw: cw.CopyResult(
+                title="mock 标题", body="mock 正文", tags=["#AI", "#测试"]
+            )
+        )
+        monkeypatch.setattr(
+            cw, "generate_script",
+            lambda title, theme, body, **kw: cw.ScriptResult(
+                scenes=[cw.ScriptScene(index=1, narration="口播", visual="画面", duration=4)]
+            )
+        )
+
+        # submit + .fn 同步执行
+        tid = submit("copy", "generate_copy_task", account_id=acc_id, topic_id=topic_id,
+                     run_account_id=acc_id)
+        ret = generate_copy_task.fn(task_id=tid, account_id=acc_id, topic_id=topic_id)
+
+        assert ret["content_id"] > 0
+        assert ret["title"] == "mock 标题"
+        assert ret["scenes"] == 1
+        assert status(tid)["status"] == "finished"
+
+        # 验证 Content 入库
+        from app.models.content import Content, ContentStatus
+        with SyncSessionLocal() as s:
+            c = s.get(Content, ret["content_id"])
+            assert c.title == "mock 标题"
+            assert c.body == "mock 正文"
+            assert c.tags == ["#AI", "#测试"]
+            assert len(c.video_script) == 1
+            assert c.status == ContentStatus.PENDING_REVIEW
+            # 选题标 adopted
+            t = s.get(Topic, topic_id)
+            assert t.status == TopicStatus.ADOPTED
+
+    def test_generate_copy_no_theme_fails(self, clean_db, monkeypatch):
+        """账号没配主题 → Content 标 FAILED。"""
+        from app.db import SyncSessionLocal
+        from app.models import Account, Platform
+        from app.models.topic import Topic, TopicStatus
+        from app.queue import submit, status, generate_copy_task
+
+        with SyncSessionLocal() as s:
+            acc = Account(platform=Platform.XHS, nickname="无主题号", topic_theme="")
+            s.add(acc)
+            s.commit()
+            s.refresh(acc)
+            topic = Topic(
+                source_platform=Platform.XHS, title="随便",
+                heat_score=10.0, match_score=0.5, matched_account_ids=[acc.id],
+                status=TopicStatus.CANDIDATE,
+            )
+            s.add(topic)
+            s.commit()
+            s.refresh(topic)
+            acc_id, topic_id = acc.id, topic.id
+
+        tid = submit("copy", "generate_copy_task", account_id=acc_id, topic_id=topic_id,
+                     run_account_id=acc_id)
+        with pytest.raises(RuntimeError):
+            generate_copy_task.fn(task_id=tid, account_id=acc_id, topic_id=topic_id)
+
+        assert status(tid)["status"] == "failed"
+        assert "topic_theme" in status(tid)["error_log"]
+
+    def test_generate_copy_service_fails_marks_content_failed(self, clean_db, monkeypatch):
+        """copywriter 服务抛异常 → Content 保留且标 FAILED(Spec 5.3 兜底)。"""
+        from app.db import SyncSessionLocal
+        from app.models import Account, Platform
+        from app.models.topic import Topic, TopicStatus
+        from app.queue import submit, status, generate_copy_task
+        from app.services import copywriter as cw
+
+        with SyncSessionLocal() as s:
+            acc = Account(platform=Platform.DOUYIN, nickname="抖音号", topic_theme="科技")
+            s.add(acc)
+            s.commit()
+            s.refresh(acc)
+            topic = Topic(
+                source_platform=Platform.DOUYIN, title="失败测试",
+                heat_score=5.0, match_score=0.3, matched_account_ids=[acc.id],
+                status=TopicStatus.CANDIDATE,
+            )
+            s.add(topic)
+            s.commit()
+            s.refresh(topic)
+            acc_id, topic_id = acc.id, topic.id
+
+        def boom(*a, **kw):
+            raise cw.CopywriterError("模拟 LLM 失败")
+        monkeypatch.setattr(cw, "generate_copy", boom)
+
+        tid = submit("copy", "generate_copy_task", account_id=acc_id, topic_id=topic_id,
+                     run_account_id=acc_id)
+        with pytest.raises(RuntimeError):
+            generate_copy_task.fn(task_id=tid, account_id=acc_id, topic_id=topic_id)
+
+        assert status(tid)["status"] == "failed"
+        # Content 保留且标 FAILED
+        from app.models.content import Content, ContentStatus
+        with SyncSessionLocal() as s:
+            c = s.query(Content).filter(Content.account_id == acc_id).one()
+            assert c.status == ContentStatus.FAILED
+            assert c.error_log is not None
+
+
 class TestDBModels:
     """DB 模型基础(配合 DEV-PLAN 验收:CRUD 测试数据能存能取)。"""
 

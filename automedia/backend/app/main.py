@@ -21,7 +21,9 @@ from pydantic import BaseModel, Field
 from app.api.accounts import router as accounts_router
 from app.api.comments import router as comments_router
 from app.api.contents import router as contents_router
+from app.api.orchestrator import router as orchestrator_router
 from app.api.publish import router as publish_router
+from app.api.stats import router as stats_router
 from app.api.topics import router as topics_router
 from app.api.videos import router as videos_router
 from app.config import settings
@@ -57,8 +59,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AutoMedia API",
-    description="自媒体全自动运营流水线 - Phase 1-5(基础设施+账号矩阵+热点文案+视频智能剪辑+多平台分发与回评)",
-    version="0.5.0",
+    description="自媒体全自动运营流水线 - Phase 1-6(基础设施+账号矩阵+热点文案+视频智能剪辑+多平台分发与回评+全链路编排与面板整合)",
+    version="0.6.0",
     lifespan=lifespan,
 )
 
@@ -90,6 +92,10 @@ app.include_router(videos_router)
 # ---------- Phase 5:发布 + 评论路由 ----------
 app.include_router(publish_router)
 app.include_router(comments_router)
+
+# ---------- Phase 6:编排 + 统计路由 ----------
+app.include_router(orchestrator_router)
+app.include_router(stats_router)
 
 
 # ---------- 响应模型 ----------
@@ -182,8 +188,8 @@ async def root():
     """根路径,返回服务信息。"""
     return {
         "name": "AutoMedia API",
-        "version": "0.1.0",
-        "phase": 1,
+        "version": "0.6.0",
+        "phase": 6,
         "docs": "/docs",
         "health": "/health",
     }
