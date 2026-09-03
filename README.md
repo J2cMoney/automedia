@@ -68,3 +68,7 @@ See [`automedia/README.md`](automedia/README.md) for the detailed guide, or [`ä½
 - Migrate copywriting/reply generation to OpenAI models and adopt vision models for the editing brain
 - Grow the Codex "agent ops" loop: analytics-driven content plans proposed and implemented by agents, gated by the test suite
 - Publish a real-world cost guide for running a 10-account matrix
+
+## License
+
+Released under the [MIT License](LICENSE).
